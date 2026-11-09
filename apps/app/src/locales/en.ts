@@ -188,5 +188,11 @@ const en: Record<string, string> = {
   "plot.noRoad": "No public road along the plot boundary was found in the road data — check legal access to a public road.",
   "reason.no_road_access": "No public road access detected; a building permit requires access to a public road.",
   "check.engineer.road_access": "Legal access to a public road",
+  "surface.inner_horizontal": "inner horizontal",
+  "surface.conical": "conical",
+  "surface.approach": "approach",
+  "surface.transitional": "transitional",
+  "restrict.title": "Restrictions",
+  "restrict.none": "No restrictions found in the layers checked.",
 };
 export default en;

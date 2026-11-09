@@ -41,6 +41,20 @@ export interface Site {
   officialAreaM2?: number;
   /** Public road access detected from road data (country module). */
   roadAccess?: "yes" | "no" | "unknown";
+  /** Restriction effects found for this plot (airport, flood, protected areas…), applied by the engine. */
+  restrictions?: SiteRestriction[];
+}
+
+export interface SiteRestriction {
+  id: string;
+  severity: "info" | "warning" | "critical";
+  messageKey: string;
+  params?: Record<string, string | number>;
+  effect:
+    | { type: "cap_height"; maxHeightM: number }
+    | { type: "cap_floors"; maxFloors: number }
+    | { type: "block"; reason: string }
+    | { type: "info" };
 }
 
 export interface AnalysisInput {

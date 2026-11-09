@@ -91,6 +91,23 @@ const messages: Record<string, string> = {
   "cy.relax.lcaFloor.grant": "Where the §12.8 incentives are used, the authority may allow one floor above the zone maximum, reducing the coverage accordingly.",
   "cy.relax.lcaFloor.conditions": "Discretionary; the character of the area must not be affected. Unified complexes over 10 units may not be built on pilotis.",
   "cy.relax.listed.grantKep": "Up to +25% density by transferring building coefficient from a listed building (Central Commercial Area).",
+  "cy.restrict.natura": "Natura 2000 site {{code}} \"{{name}}\": any development needs an Appropriate Assessment under the Habitats Directive (Art. 6) and the approval of the Department of Environment; building may be refused.",
+  "cy.restrict.forest": "Forest Department protected site ({{name}}): development is restricted; check with the Forest Department.",
+  "cy.restrict.flood": "Flood zone: the plot lies in the {{years}}-year floodplain of {{river}}. Consultation with the Water Development Department and flood-protection measures are required; building may be restricted.",
+  "cy.restrict.coast": "About {{distance}} m from the coastline: the Coastal Protection Zone (Foreshore Protection Law, Cap. 59; Larnaca Local Plan Appendix 3) may restrict building — check the zone line and the required distance.",
+  "cy.restrict.psz1": "Airport Public Safety Zone (100 × 600 m, Larnaca LP §32.4.1α): no building or other development is allowed — only low crops.",
+  "cy.restrict.psz2": "Airport Public Safety Zone (350 × 3,500 m, Larnaca LP §32.4.1β): no new building or replacement building; only small additions and uses that don't increase population.",
+  "cy.restrict.olsAltitude": "Airport height limit (indicative, ICAO Annex 14 — {{surface}} surface): the top of the building may not exceed about {{altitude}} m above sea level. Subtract the ground level for the maximum building height. Department of Civil Aviation consent required.",
+  "cy.restrict.olsHeight": "Airport height limit (indicative, ICAO Annex 14 — {{surface}} surface): top of building ≤ about {{altitude}} m above sea level; ground about {{ground}} m, so maximum building height about {{height}} m. Department of Civil Aviation consent required.",
+  "cy.restrict.noiseGr1": "Airport noise zone (Lnight 60 dB(A), Larnaca LP §32.5.1): zone Γρ1 is for offices only — two-storey buildings with flat roofs; no new housing.",
+  "cy.restrict.noiseEb7g": "Airport noise zone (Lnight 60 dB(A), Larnaca LP §32.5.5β): dwellings and student housing only with sound insulation of the external envelope Rw ≥ 40 dB.",
+  "cy.restrict.noiseEda1a": "Airport noise zone (Lnight 60 dB(A), Larnaca LP §32.5.4–32.5.5α): no housing; urban hotels only with sound insulation Rw ≥ 40 dB.",
+  "cy.restrict.noiseT3b": "Airport noise zone (Lnight 60 dB(A), Larnaca LP §32.5.5γ): hotels, tourist villas, apartments and houses only with sound insulation Rw ≥ 40 dB.",
+  "check.restriction.airport": "Airport limits (height, safety zones, noise) with the Department of Civil Aviation",
+  "check.restriction.flood": "Flood risk and measures with the Water Development Department",
+  "check.restriction.natura2000": "Natura 2000 Appropriate Assessment with the Department of Environment",
+  "check.restriction.forest": "Restrictions with the Forest Department",
+  "check.restriction.coast": "Coastal Protection Zone line and required distance from the sea",
 };
 
 export default messages;

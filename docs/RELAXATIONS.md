@@ -106,3 +106,26 @@ streets are not covered yet:
   calculated instead of only listed.
 - Digitise the Larnaca Urban Centre boundary (Plan No. 6) so §11.6.4.2 can be calculated.
 - Read Annex B itself (not only the ETEK summary) for the front/road distances.
+
+## Restrictions (Larnaca / Cyprus)
+
+`packages/countries/cy/src/restrictions.ts`. These are checked when the plot is selected, before
+any calculation. The engine applies the effects (block / height cap / floor cap), and these also
+hold in the relaxed scenario.
+
+| Layer | Source | Effect |
+|---|---|---|
+| Airport Public Safety Zones 100×600 m and 350×3,500 m | Larnaca LP §32.4.1. Geometry is approximated from the stated dimensions and the runway ends (OSM); check against Plan 13/13A | Not permitted |
+| Airport height limit | ICAO Annex 14 surfaces for runway 04/22 (code 4 precision): inner horizontal 45 m, conical 5%, approach 2%/2.5%, transitional 14.3%; aerodrome elevation 2.4 m | Altitude limit above sea level. It becomes a height cap only when ground elevation is known (`ELEVATION_PROVIDER=open-meteo`, untested in this sandbox) |
+| Airport noise zones (Lnight 60 dB(A)) | Larnaca LP §32.4.2, §32.5: Γρ1 (offices, 2 floors), Εβ7γ, ΕΔΑ1α, Τ3β(Ε) | Note; Γρ1 capped at 2 floors |
+| Flood zones (20/100/500-year) | DLS INSPIRE NZ (Water Development Department flood maps) | Critical (20 yr) / warning (100 yr) / note (500 yr) |
+| Natura 2000 | EEA Natura 2000 service (EU-wide), e.g. CY6000002 Larnaca Salt Lakes | Critical: Appropriate Assessment |
+| Forest Department protected sites | DLS INSPIRE PS | Warning |
+| Coastal zone (within 100 m of the shoreline) | DLS INSPIRE SR shoreline; Foreshore Protection Law Cap. 59; LP Appendix 3 | Warning |
+
+Still to add:
+- Department of Antiquities controlled areas and archaeological sites (Kition and others): no
+  open digital source found yet;
+- the official PSZ and noise-contour geometry (Plans 8, 13, 13A);
+- ground elevation for an exact height cap;
+- road widening / street alignment plans.

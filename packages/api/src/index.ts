@@ -10,6 +10,7 @@ import {
   withFallback,
   type CountryModule,
   type ProviderContext,
+  type RestrictionHit,
 } from "@plotcheck/country-sdk";
 import { cached, type Cache } from "./cache.ts";
 import { limitConcurrency, RateLimiter } from "./limits.ts";
@@ -78,12 +79,26 @@ export interface ZonesResponse {
   parcel: Parcel;
   zones: ZoneHit[];
   site?: SiteContext;
+  restrictions: RestrictionHit[];
   primary?: { zone: ZoneHit; rules: ZoneRuleSet; coverage: "curated" | "source_only"; mismatches: Mismatch[] };
 }
 export interface Mismatch {
   constraint: string;
   curated: number;
   published: number;
+}
+
+function toEngineEffect(e: RestrictionHit["effect"]) {
+  switch (e.type) {
+    case "cap_height":
+      return { type: "cap_height" as const, maxHeightM: e.maxHeightM };
+    case "cap_floors":
+      return { type: "cap_floors" as const, maxFloors: e.maxFloors };
+    case "block":
+      return { type: "block" as const, reason: e.reason };
+    default:
+      return { type: "info" as const };
+  }
 }
 
 export function createApi(deps: ApiDeps) {
@@ -123,9 +138,15 @@ export function createApi(deps: ApiDeps) {
       const { result } = await withFallback(country.planningProviders, (prov) => prov.zonesFor(ctx(signal), parcel), (r) => r.length === 0);
       return result;
     });
-    const site = country.siteContext ? await country.siteContext(ctx(signal), parcel).catch(() => undefined) : undefined;
+    const [site, layerHits] = await Promise.all([
+      country.siteContext ? country.siteContext(ctx(signal), parcel).catch(() => undefined) : Promise.resolve(undefined),
+      cached(deps.cache, `restrict:${country.code}:${parcel.nationalRef}`, TTL.zones, async () =>
+        (await Promise.all(country.restrictionLayers.filter((l) => l.enabled).map((l) => l.check(ctx(signal), parcel).catch(() => [] as RestrictionHit[])))).flat(),
+      ).then((r) => r.value),
+    ]);
     const zone = zones[0];
-    if (!zone) return { parcel, zones, ...(site ? { site } : {}) };
+    const restrictions = [...layerHits, ...(zone && country.restrictionsForZone ? country.restrictionsForZone(zone) : [])];
+    if (!zone) return { parcel, zones, restrictions, ...(site ? { site } : {}) };
     const layers = [...country.ruleLayers, ...(country.sourceLayerForZone ? [country.sourceLayerForZone(zone)] : [])];
     const rules = resolveRules(zone.jurisdiction, zone.zoneCode, layers, zone.planRef);
     // Compare curated values with what the source publishes today (catches plan changes).
@@ -136,7 +157,7 @@ export function createApi(deps: ApiDeps) {
         if (typeof curated === "number" && Math.abs(curated - published) > 1e-9) mismatches.push({ constraint: name, curated, published });
       }
     }
-    return { parcel, zones, ...(site ? { site } : {}), primary: { zone, rules, coverage: rules.curated ? "curated" : "source_only", mismatches } };
+    return { parcel, zones, restrictions, ...(site ? { site } : {}), primary: { zone, rules, coverage: rules.curated ? "curated" : "source_only", mismatches } };
   }
 
   // ---------- routes ----------
@@ -192,7 +213,12 @@ export function createApi(deps: ApiDeps) {
       const z = await zonesFor(country, parcel, req.signal);
       if (!z.primary) throw new HttpError(422, "no_zone", "No planning zone found for this plot");
       const params = mergeParams(defaultParams(country), b["params"]);
-      const site = { geometry: parcel.geometry, officialAreaM2: parcel.officialAreaM2, ...(z.site ? { roadAccess: z.site.roadAccess } : {}) };
+      const site = {
+        geometry: parcel.geometry,
+        officialAreaM2: parcel.officialAreaM2,
+        ...(z.site ? { roadAccess: z.site.roadAccess } : {}),
+        restrictions: z.restrictions.map((h) => ({ id: h.layerId, severity: h.severity, messageKey: h.messageKey, ...(h.params ? { params: h.params } : {}), effect: toEngineEffect(h.effect) })),
+      };
       const baseFar = z.primary.rules.constraints.far?.max_val?.[0]?.expression;
       const relaxations = country.relaxationsFor?.(z.primary.zone, { baseFar: typeof baseFar === "number" ? baseFar : undefined, parcel, ...(z.site ? { site: z.site } : {}) }) ?? [];
       const useRaw = b["use"];
@@ -207,6 +233,7 @@ export function createApi(deps: ApiDeps) {
         zone: z.primary.zone,
         otherZones: z.zones.slice(1),
         site: z.site,
+        restrictions: z.restrictions,
         coverage: z.primary.coverage,
         mismatches: z.primary.mismatches,
         rules: z.primary.rules,

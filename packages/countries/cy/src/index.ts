@@ -6,6 +6,7 @@ import { cyPlotIdSchema } from "./plotId.ts";
 import { cyRuleLayers, cySourceLayer, cyUsesForZone } from "./rules.ts";
 import { cyRelaxationsFor } from "./relaxations.ts";
 import { cySiteContext } from "./site.ts";
+import { cyRestrictionLayers, larnacaNoiseFor } from "./restrictions.ts";
 import el from "./i18n/el.ts";
 import en from "./i18n/en.ts";
 
@@ -19,7 +20,8 @@ export const cyprus: CountryModule = {
   // Tried in order: fast REST query, then the standard INSPIRE WFS, then PAL (disabled).
   parcelProviders: [dlsRestParcels, dlsInspireParcels, palSurveyParcels],
   planningProviders: [dlsPlanningZones],
-  restrictionLayers: [], // phase 2: flood (NZ), protected sites (PS), road access (TN), …
+  restrictionLayers: cyRestrictionLayers,
+  restrictionsForZone: (zone) => [larnacaNoiseFor(zone.zoneCode, zone.planRef)].filter((x) => x !== undefined),
   plotIdSchema: cyPlotIdSchema,
   ruleLayers: cyRuleLayers,
   usesForZone: cyUsesForZone,
@@ -35,7 +37,7 @@ export const cyprus: CountryModule = {
     minRowHouseWidthM: 6.5,
   },
   legal: { disclaimerKey: "cy.disclaimer", attributionKeys: ["cy.attribution.dls"] },
-  features: { docScan: false, plotIdSearch: false, restrictions: false, financials: false, brokering: false, ads: false },
+  features: { docScan: false, plotIdSearch: false, restrictions: true, financials: false, brokering: false, ads: false },
   mapLayers: [
     {
       id: "cy-ortho-2019",
@@ -75,5 +77,6 @@ export * from "./plotId.ts";
 export * from "./rules.ts";
 export * from "./relaxations.ts";
 export { cySiteContext } from "./site.ts";
+export * from "./restrictions.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";
 export { mapZoneAttributes, samplePoints, toZoneHit } from "./dls/zones.ts";

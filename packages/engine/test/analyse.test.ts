@@ -145,3 +145,13 @@ describe("stepped setbacks", () => {
     expect(r.checks.find((c) => c.id === "stepped_setbacks")?.params).toMatchObject({ floor: 4, setback: 4, top: 5 });
   });
 });
+
+describe("restrictions in the engine", () => {
+  it("a block makes the result not permitted; a height cap limits floors", () => {
+    const r1 = analyse({ site: { officialAreaM2: 530, restrictions: [{ id: "airport:psz1", severity: "critical", messageKey: "x", effect: { type: "block", reason: "PSZ" } }] }, rules: rules(), use: "apartment_block", params });
+    expect(r1.status).toBe("not_allowed");
+    const r2 = analyse({ site: { officialAreaM2: 530, restrictions: [{ id: "airport:ols", severity: "warning", messageKey: "x", effect: { type: "cap_height", maxHeightM: 6.5 } }] }, rules: rules(), use: "apartment_block", params });
+    expect(r2.figures.allowedFloors).toBe(2); // 6.5 / 3.2
+    expect(r2.toBeChecked).toContain("check.restriction.airport");
+  });
+});

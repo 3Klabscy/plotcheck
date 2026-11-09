@@ -12,6 +12,9 @@
     "@turf/point-on-feature": "npm:@turf/point-on-feature@7.4.0",
     "@turf/point-to-polygon-distance": "npm:@turf/point-to-polygon-distance@7.4.0",
     "fast-xml-parser": "npm:fast-xml-parser@4.5.7",
+    "fast-png": "npm:fast-png@6",
+    "@turf/simplify": "npm:@turf/simplify@7.4.0",
+    "@turf/boolean-intersects": "npm:@turf/boolean-intersects@7.4.0",
     "geojson": "npm:@types/geojson@7946.0.16"
   }
 }

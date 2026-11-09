@@ -188,5 +188,11 @@ const el: Record<string, string> = {
   "plot.noRoad": "Δεν βρέθηκε δημόσιος δρόμος κατά μήκος των ορίων του τεμαχίου — ελέγξτε τη νόμιμη πρόσβαση σε δημόσιο δρόμο.",
   "reason.no_road_access": "Δεν εντοπίστηκε πρόσβαση σε δημόσιο δρόμο· για άδεια οικοδομής απαιτείται πρόσβαση σε δημόσιο δρόμο.",
   "check.engineer.road_access": "Νόμιμη πρόσβαση σε δημόσιο δρόμο",
+  "surface.inner_horizontal": "εσωτερική οριζόντια",
+  "surface.conical": "κωνική",
+  "surface.approach": "προσέγγισης",
+  "surface.transitional": "μεταβατική",
+  "restrict.title": "Περιορισμοί",
+  "restrict.none": "Δεν βρέθηκαν περιορισμοί στα επίπεδα που ελέγχθηκαν.",
 };
 export default el;

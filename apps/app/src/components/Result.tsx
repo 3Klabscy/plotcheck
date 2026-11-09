@@ -15,6 +15,8 @@ export function reasonText(t: TFunction, lng: string, c: Pick<Check, "reasonKey"
   for (const [k, v] of Object.entries(c.params ?? {})) {
     if (k === "use") params[k] = t(`use.${v}`);
     else if (k === "type") params[k] = t(`unit.${v}`);
+    else if (k === "surface") params[k] = t(`surface.${v}`);
+    else if (k === "years" || k === "code") params[k] = String(v);
     else params[k] = typeof v === "number" ? fmtNumber(v, lng, 1) : String(v);
   }
   return t(c.reasonKey, params);

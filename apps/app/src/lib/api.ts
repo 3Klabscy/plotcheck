@@ -28,10 +28,21 @@ export interface ParcelsResponse {
   parcels: Parcel[];
 }
 
+export interface RestrictionHit {
+  layerId: string;
+  kind: string;
+  severity: "info" | "warning" | "critical";
+  messageKey: string;
+  params?: Record<string, string | number>;
+  effect: { type: string };
+  provenance: { source: string; sourceRef?: string };
+}
+
 export interface ZonesResponse {
   parcel: Parcel;
   zones: ZoneHit[];
   site?: SiteContext;
+  restrictions: RestrictionHit[];
   primary?: { zone: ZoneHit; rules: ZoneRuleSet; coverage: "curated" | "source_only"; mismatches: Mismatch[] };
 }
 

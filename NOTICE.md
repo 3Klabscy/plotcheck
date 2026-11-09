@@ -22,11 +22,10 @@
   contributors, ODbL 1.0 — the extract is shared under the same licence.
 - Larnaca road names (`packages/countries/cy/data/larnaca-roads-dls.json`): road geometry from the
   DLS INSPIRE road network; names read from the **DLS road map of Larnaca** (Larnaka_gr.pdf,
-  1:10,000) and matched to Cyprus Post spellings. **DLS map copyright: any use beyond personal use
-  needs written permission from DLS** (ayiannakou@dls.moi.gov.cy). Development use only until
-  confirmed.
+  1:10,000) and matched to Cyprus Post spellings. DLS map copyright — **used with permission
+  granted to the operator (confirmed by the client, 2026-11-09)**; keep the permission on file.
 - Street names and postcodes (`packages/countries/cy/data/larnaca-streets-cypruspost.json`): Cyprus
-  Post postcode file (postal_codes.xlsx, public download). Reuse terms to be confirmed with Cyprus
-  Post; their official postcode API is the intended production source.
+  Post postcode file (postal_codes.xlsx, public download). **Used with permission granted to the
+  operator (confirmed by the client, 2026-11-09).** Their official postcode API can keep it current.
 - Street map tiles: © OpenStreetMap contributors (prototype only — the OSMF tile usage policy
   does not allow production app traffic; replace with a hosted tile provider).

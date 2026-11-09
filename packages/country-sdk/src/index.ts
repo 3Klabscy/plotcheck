@@ -136,6 +136,8 @@ export interface CountryModule {
   usesForZone?(zone: ZoneHit): { value: UseType[] | null; conditional: UseType[]; provenance: Provenance };
   /** Planning relaxations/incentives that may apply to a plot in this zone (island-wide + area). */
   relaxationsFor?(zone: ZoneHit, ctx: { baseFar?: number; parcel?: Parcel; site?: SiteContext }): Relaxation[];
+  /** Restrictions that follow from the zone itself (e.g. airport noise zones). */
+  restrictionsForZone?(zone: ZoneHit): RestrictionHit[];
   /** Road access, frontage and postcodes for a plot, where the country has the data. */
   siteContext?(ctx: ProviderContext, parcel: Parcel): Promise<SiteContext | undefined>;
   /** Turn a published zone hit into a "source" rule layer (coefficients the source publishes). */

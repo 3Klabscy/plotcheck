@@ -19,6 +19,10 @@ import {
   larnacaStreetFrontage,
   parseRestParcels,
   cySiteContext,
+  olsHeightAboveAerodrome,
+  larnacaAirport,
+  parseRawFeatureInfo,
+  larnacaNoiseFor,
 } from "../src/index.ts";
 
 const fx = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -246,5 +250,34 @@ describe("Larnaca site context (DLS roads + Cyprus Post)", () => {
   });
   it("returns nothing outside the covered map area", () => {
     expect(cySiteContext({ geometry: { type: "Polygon", coordinates: [[[33.0, 34.7], [33.001, 34.7], [33.001, 34.701], [33.0, 34.7]]] }, identifiers: {} } as never)).toBeUndefined();
+  });
+});
+
+describe("Larnaca airport and flood restrictions", () => {
+  it("applies the ICAO surfaces: inner horizontal near the runway, conical further out", () => {
+    expect(olsHeightAboveAerodrome(33.6368, 34.9135)).toMatchObject({ height: 45, surface: "inner_horizontal" }); // Finikoudes ~3.3 km
+    const far = olsHeightAboveAerodrome(33.615, 34.93)!; // ~5.5 km
+    expect(far.surface).toBe("conical");
+    expect(far.height).toBeGreaterThan(45);
+    expect(far.height).toBeLessThanOrEqual(145);
+    expect(olsHeightAboveAerodrome(33.30, 35.10)).toBeUndefined(); // far away: no surface
+  });
+  it("finds the public safety zone on the extended runway centreline", async () => {
+    const tri = { identifiers: {}, geometry: { type: "Polygon", coordinates: [[[33.6105, 34.8627], [33.6107, 34.8627], [33.6107, 34.8629], [33.6105, 34.8629], [33.6105, 34.8627]]] } } as never;
+    const ctx = { fetch: (async () => new Response("")) as typeof fetch, env: () => undefined };
+    const hits = await larnacaAirport.check(ctx, tri);
+    expect(hits[0]).toMatchObject({ layerId: "airport:psz1", effect: { type: "block" } });
+  });
+  it("parses multi-layer flood GetFeatureInfo (esri raw xml)", () => {
+    const xml = `<esri_wms:FeatureInfoResponse><esri_wms:FeatureInfoCollection layername="NZ.RiskZone_Floodplain_100"><esri_wms:FeatureInfo><esri_wms:Field><esri_wms:FieldName><![CDATA[Name]]></esri_wms:FieldName><esri_wms:FieldValue><![CDATA[Ποταμός Καμαρών]]></esri_wms:FieldValue></esri_wms:Field></esri_wms:FeatureInfo></esri_wms:FeatureInfoCollection></esri_wms:FeatureInfoResponse>`;
+    expect(parseRawFeatureInfo(xml)).toEqual([{ layer: "NZ.RiskZone_Floodplain_100", fields: { Name: "Ποταμός Καμαρών" } }]);
+  });
+  it("airport noise rules follow the zone code (Γρ1: offices, max 2 floors)", () => {
+    expect(larnacaNoiseFor("Γρ1", "401")).toMatchObject({ effect: { type: "cap_floors", maxFloors: 2 } });
+    expect(larnacaNoiseFor("Κα4", "401")).toBeUndefined();
+  });
+  it("restriction messages exist in el and en", () => {
+    for (const k of ["cy.restrict.natura", "cy.restrict.flood", "cy.restrict.coast", "cy.restrict.psz1", "cy.restrict.psz2", "cy.restrict.olsAltitude", "cy.restrict.olsHeight", "cy.restrict.noiseGr1", "check.restriction.airport", "check.restriction.flood"])
+      for (const l of ["el", "en"]) expect(cyprus.messages[l]![k], `${l}:${k}`).toBeTruthy();
   });
 });

@@ -5,7 +5,7 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import type { PlotMapHandle } from "../components/PlotMap.types";
-import { ResultView, UseOptions } from "../components/Result";
+import { ResultView, UseOptions, reasonText } from "../components/Result";
 import { Button, Card, Loading, Notice, Row, SectionTitle, styles } from "../components/ui";
 import { api, ApiError, type AnalyseResponse, type CountryConfig, type ZonesResponse } from "../lib/api";
 import { fmtArea, fmtNumber, fmtPercent } from "../lib/format";
@@ -221,6 +221,24 @@ export default function Home() {
                 </Text>
               ))}
             </>
+          )}
+          {zones && (
+            <View style={{ marginTop: 12 }} testID="restrictions">
+              <Text style={[styles.small, { fontWeight: "700", color: colors.ink, marginBottom: 4 }]}>{t("restrict.title")}</Text>
+              {zones.restrictions.length === 0 && <Text style={styles.small}>{t("restrict.none")}</Text>}
+              {[...zones.restrictions]
+                .sort((a, b) => ["critical", "warning", "info"].indexOf(a.severity) - ["critical", "warning", "info"].indexOf(b.severity))
+                .map((r, i) => (
+                  <View key={`${r.layerId}-${i}`} style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
+                    <Text style={{ color: r.severity === "critical" ? colors.notAllowed : r.severity === "warning" ? colors.maybe : colors.muted, fontWeight: "700" }}>
+                      {r.severity === "critical" ? "⛔" : r.severity === "warning" ? "⚠" : "ℹ"}
+                    </Text>
+                    <Text style={[styles.small, { color: colors.ink, flex: 1 }]}>
+                      {reasonText(t, lng, { reasonKey: r.messageKey, params: r.params })}
+                    </Text>
+                  </View>
+                ))}
+            </View>
           )}
           {step === "parcel" && zone && !busy && <Button title={t("btn.confirm")} onPress={confirm} testID="confirm" />}
           {neighbours.length > 0 && step === "parcel" && (

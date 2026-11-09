@@ -3,11 +3,14 @@
   "specifiers": {
     "npm:@turf/area@7.4.0": "7.4.0",
     "npm:@turf/bbox@7.4.0": "7.4.0",
+    "npm:@turf/boolean-intersects@7.4.0": "7.4.0",
     "npm:@turf/boolean-point-in-polygon@7.4.0": "7.4.0",
     "npm:@turf/buffer@7.4.0": "7.4.0",
     "npm:@turf/point-on-feature@7.4.0": "7.4.0",
     "npm:@turf/point-to-polygon-distance@7.4.0": "7.4.0",
+    "npm:@turf/simplify@7.4.0": "7.4.0",
     "npm:@types/geojson@7946.0.16": "7946.0.16",
+    "npm:fast-png@6": "6.4.0",
     "npm:fast-xml-parser@4.5.7": "4.5.7"
   },
   "npm": {
@@ -38,6 +41,26 @@
         "tslib"
       ]
     },
+    "@turf/boolean-disjoint@7.4.0": {
+      "integrity": "sha512-B6nXGFHa1+m181BZ5MOKa1l7/otws/NonUpOd0CKWTuBUzrlc6e60z/kRp5ceRYmE2LFOH5ZZxItnrsWgKc2VA==",
+      "dependencies": [
+        "@turf/boolean-point-in-polygon",
+        "@turf/helpers",
+        "@turf/line-intersect",
+        "@turf/meta",
+        "@turf/polygon-to-line",
+        "@types/geojson",
+        "tslib"
+      ]
+    },
+    "@turf/boolean-intersects@7.4.0": {
+      "integrity": "sha512-tV30WLBgLh89uGYpWsKjU29eMhdyhSh2Sc1IKmv1W0YFHKwp6oDm2eRajMzMgdtN8cl6Jyb8oFCmw4LbMMuWAQ==",
+      "dependencies": [
+        "@turf/boolean-disjoint",
+        "@types/geojson",
+        "tslib"
+      ]
+    },
     "@turf/boolean-point-in-polygon@7.4.0": {
       "integrity": "sha512-GQrHc6WSDHhf32GB/b9AGyOeC05AQ3nGN7ooWTrlCYefKn7X9/2wG9BNexF47AuyDq5jPdOvITVR26BLFWV+mA==",
       "dependencies": [
@@ -45,6 +68,15 @@
         "@turf/invariant",
         "@types/geojson",
         "point-in-polygon-hao",
+        "tslib"
+      ]
+    },
+    "@turf/boolean-point-on-line@7.4.0": {
+      "integrity": "sha512-5i5UBeZf/LuzgavkIj8L8L5/8SYWItWzQQcE9ymFZr60lV5lM8eFvQDfzAz2R3WQFCrxXExPqNvAVZOKGUyvoA==",
+      "dependencies": [
+        "@turf/helpers",
+        "@turf/invariant",
+        "@types/geojson",
         "tslib"
       ]
     },
@@ -67,6 +99,16 @@
       "dependencies": [
         "@turf/bbox",
         "@turf/helpers",
+        "@types/geojson",
+        "tslib"
+      ]
+    },
+    "@turf/clean-coords@7.4.0": {
+      "integrity": "sha512-xl3lVPey/FyVc3Z+drAWtVuVtvt737RHKGUMGyuskmKYW0JUeFDgqSR0OnrDfxXWb58Im/65BgPd1B+TUA9WfA==",
+      "dependencies": [
+        "@turf/boolean-point-on-line",
+        "@turf/helpers",
+        "@turf/invariant",
         "@types/geojson",
         "tslib"
       ]
@@ -116,6 +158,16 @@
       "integrity": "sha512-zAezGlwWHPyU0zxwcX2wQY3RkRpwuoBmhhNE9HY9kWhFDkCxZ3aWK5URKwa/SWKJbj9aztO+8vtdiBA28KVJFg==",
       "dependencies": [
         "jsts"
+      ]
+    },
+    "@turf/line-intersect@7.4.0": {
+      "integrity": "sha512-5qNmEJ/0tQEaUUKSt2zIZGIS6eYGn3T7Z32yN6+Py0ANs8ln3dQNWaDyOEMms/qVY7BFvSaO+8iBmD8vlHdNcA==",
+      "dependencies": [
+        "@turf/helpers",
+        "@types/geojson",
+        "robust-predicates@2.0.4",
+        "tinyqueue",
+        "tslib"
       ]
     },
     "@turf/meta@7.4.0": {
@@ -226,8 +278,22 @@
         "tslib"
       ]
     },
+    "@turf/simplify@7.4.0": {
+      "integrity": "sha512-HTolHFuXLReKHJoh3iz92+WpF5EsuCmmZR7fNv3hWnA4hZfkuEzbGB/WZqRdQpvDs99IUS8QIc6BAp6FHzQbBQ==",
+      "dependencies": [
+        "@turf/clean-coords",
+        "@turf/clone",
+        "@turf/helpers",
+        "@turf/meta",
+        "@types/geojson",
+        "tslib"
+      ]
+    },
     "@types/geojson@7946.0.16": {
       "integrity": "sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg=="
+    },
+    "@types/pako@2.0.4": {
+      "integrity": "sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw=="
     },
     "d3-array@2.12.1": {
       "integrity": "sha512-B0ErZK/66mHtEsR1TkPEEkwdy+WDesimkM5gpZr5Dsg54BiTA5RXtYW5qTLIAcekaS9xfZrzBLF/OAkB3Qn1YQ==",
@@ -241,6 +307,14 @@
         "d3-array"
       ]
     },
+    "fast-png@6.4.0": {
+      "integrity": "sha512-kAqZq1TlgBjZcLr5mcN6NP5Rv4V2f22z00c3g8vRrwkcqjerx7BEhPbOnWCPqaHUl2XWQBJQvOT/FQhdMT7X/Q==",
+      "dependencies": [
+        "@types/pako",
+        "iobuffer",
+        "pako"
+      ]
+    },
     "fast-xml-parser@4.5.7": {
       "integrity": "sha512-a6Qh1RMCNbSrU1+sAyAAZH3rTe+OaWJbNZIq0S+ifZciUUOQtlVxBJwoTUE2bYhysmG/RYyI5WJFIKdBahJdrQ==",
       "dependencies": [
@@ -251,20 +325,32 @@
     "internmap@1.0.1": {
       "integrity": "sha512-lDB5YccMydFBtasVtxnZ3MRBHuaoE8GKsppq+EchKL2U4nK/DmEpPHNH8MZe5HkMtpSiTSOZwfN0tzYjO/lJEw=="
     },
+    "iobuffer@5.4.0": {
+      "integrity": "sha512-DRebOWuqDvxunfkNJAlc3IzWIPD5xVxwUNbHr7xKB8E6aLJxIPfNX3CoMJghcFjpv6RWQsrcJbghtEwSPoJqMA=="
+    },
     "jsts@2.7.1": {
       "integrity": "sha512-x2wSZHEBK20CY+Wy+BPE7MrFQHW6sIsdaGUMEqmGAio+3gFzQaBYPwLRonUfQf9Ak8pBieqj9tUofX1+WtAEIg=="
+    },
+    "pako@2.2.0": {
+      "integrity": "sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w=="
     },
     "point-in-polygon-hao@1.2.4": {
       "integrity": "sha512-x2pcvXeqhRHlNRdhLs/tgFapAbSSe86wa/eqmj1G6pWftbEs5aVRJhRGM6FYSUERKu0PjekJzMq0gsI2XyiclQ==",
       "dependencies": [
-        "robust-predicates"
+        "robust-predicates@3.0.3"
       ]
+    },
+    "robust-predicates@2.0.4": {
+      "integrity": "sha512-l4NwboJM74Ilm4VKfbAtFeGq7aEjWL+5kVFcmgFA2MrdnQWx9iE/tUGvxY5HyMI7o/WpSIUFLbC5fbeaHgSCYg=="
     },
     "robust-predicates@3.0.3": {
       "integrity": "sha512-NS3levdsRIUOmiJ8FZWCP7LG3QpJyrs/TE0Zpf1yvZu8cAJJ6QMW92H1c7kWpdIHo8RvmLxN/o2JXTKHp74lUA=="
     },
     "strnum@1.1.2": {
       "integrity": "sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA=="
+    },
+    "tinyqueue@2.0.3": {
+      "integrity": "sha512-ppJZNDuKGgxzkHihX8v9v9G5f+18gzaTfrukGrq6ueg0lmH4nqVnA2IPG0AEH3jKEk2GRJCUhDoqpoiw3PHLBA=="
     },
     "tslib@2.9.1": {
       "integrity": "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="
@@ -274,11 +360,14 @@
     "dependencies": [
       "npm:@turf/area@7.4.0",
       "npm:@turf/bbox@7.4.0",
+      "npm:@turf/boolean-intersects@7.4.0",
       "npm:@turf/boolean-point-in-polygon@7.4.0",
       "npm:@turf/buffer@7.4.0",
       "npm:@turf/point-on-feature@7.4.0",
       "npm:@turf/point-to-polygon-distance@7.4.0",
+      "npm:@turf/simplify@7.4.0",
       "npm:@types/geojson@7946.0.16",
+      "npm:fast-png@6",
       "npm:fast-xml-parser@4.5.7"
     ]
   }

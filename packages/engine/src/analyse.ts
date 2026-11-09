@@ -99,6 +99,16 @@ export function analyse(input: AnalysisInput): AnalysisResult {
   } else if (uses.value.includes(use)) checks.push({ id: "use", status: "allowed", reasonKey: "reason.use_allowed", params: { use } });
   else checks.push({ id: "use", status: "not_allowed", reasonKey: "reason.use_not_allowed", params: { use, zone: rules.dist_abbr } });
 
+  // ---- 2b. Restrictions (airport, flood, protected areas…) — country modules supply the effects
+  const restrictionCaps: { height?: number; floors?: number } = {};
+  for (const r of site.restrictions ?? []) {
+    const status: CheckStatus = r.effect.type === "block" ? "not_allowed" : r.severity === "info" ? "allowed" : "maybe";
+    checks.push({ id: `restriction_${r.id}`, status, reasonKey: r.messageKey, ...(r.params ? { params: r.params } : {}) });
+    if (r.effect.type === "cap_height") restrictionCaps.height = Math.min(restrictionCaps.height ?? Infinity, r.effect.maxHeightM);
+    if (r.effect.type === "cap_floors") restrictionCaps.floors = Math.min(restrictionCaps.floors ?? Infinity, r.effect.maxFloors);
+    if (r.severity !== "info") toBeChecked.add(`check.restriction.${r.id.split(":")[0]}`);
+  }
+
   // ---- 3. Coefficients
   const farR = track("far", maxOf(rules, "far"));
   const covR = track("lot_cov_bldg", maxOf(rules, "lot_cov_bldg"));
@@ -123,8 +133,8 @@ export function analyse(input: AnalysisInput): AnalysisResult {
   const maxCoverageM2 = round(plotAreaM2 * coverageRatio, 1);
 
   // ---- 4. Floors vs stories and height
-  const maxStories = stR?.value;
-  const maxHeightM = hR?.value;
+  const maxStories = restrictionCaps.floors !== undefined ? Math.min(stR?.value ?? Infinity, restrictionCaps.floors) : stR?.value;
+  const maxHeightM = restrictionCaps.height !== undefined ? Math.min(hR?.value ?? Infinity, Math.max(0, restrictionCaps.height)) : hR?.value;
   const floorsByHeight = maxHeightM !== undefined ? Math.floor(maxHeightM / params.storeyHeightM + 1e-9) : undefined;
   const candidates = [maxStories, floorsByHeight].filter((x): x is number => x !== undefined && x > 0);
   const allowedFloors = candidates.length ? Math.min(...candidates) : 0;
