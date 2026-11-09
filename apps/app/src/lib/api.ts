@@ -1,5 +1,6 @@
 import type { NationalGrid, Parcel, SiteContext, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
 import type { AnalysisParams, AnalysisResult, FinanceParams } from "@plotcheck/engine";
+import { supabase } from "./supabase";
 
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
@@ -86,9 +87,31 @@ export interface AnalyseResponse {
   site?: SiteContext;
   rules: ZoneRuleSet;
   params: AnalysisParams;
-  results: AnalysisResult[];
+  results: (AnalysisResult & { relaxedPreview?: RelaxedPreview })[];
   finance?: FinanceDefaults;
   disclaimerKey: string;
+  /** full = paid parts included (relaxations in detail, finance); billing = paid access is in force. */
+  access?: { full: boolean; signedIn: boolean; billing: boolean };
+}
+
+export interface RelaxedPreview { gfaM2: number; floors: number; units?: number; gainM2: number }
+
+export interface Plan {
+  id: string;
+  kind: "subscription" | "report";
+  name: Record<string, string>;
+  description: Record<string, string>;
+  price_cents: number;
+  currency: string;
+  interval: "month" | "year" | null;
+}
+
+export interface AccessInfo {
+  enabled: boolean;
+  signedIn: boolean;
+  full: boolean;
+  unlocked: boolean;
+  subscription?: { plan_id: string; status: string; current_period_end: string | null; cancel_at_period_end: boolean };
 }
 
 export interface MarketStats {
@@ -122,10 +145,13 @@ export class ApiError extends Error {
 
 async function call<T>(path: string, init?: { body?: unknown; signal?: AbortSignal }): Promise<T> {
   let res: Response;
+  // signed-in users send their access token: the API returns the paid parts they are entitled to
+  const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
+  const headers: Record<string, string> = { ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: init?.body === undefined ? "GET" : "POST",
-      headers: init?.body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers,
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
       signal: init?.signal,
     });
@@ -140,6 +166,11 @@ async function call<T>(path: string, init?: { body?: unknown; signal?: AbortSign
 
 export const api = {
   countries: () => call<{ countries: CountryConfig[] }>("/v1/countries"),
+  plans: () => call<{ enabled: boolean; providers: { stripe: boolean; jcc: boolean }; plans: Plan[] }>("/v1/billing/plans"),
+  access: (country?: string, ref?: string) => call<AccessInfo>(`/v1/me/access${country && ref ? `?country=${encodeURIComponent(country)}&ref=${encodeURIComponent(ref)}` : ""}`),
+  checkout: (plan: string, provider: "stripe" | "jcc", country?: string, nationalRef?: string) =>
+    call<{ url: string }>("/v1/billing/checkout", { body: { plan, provider, ...(country ? { country } : {}), ...(nationalRef ? { nationalRef } : {}) } }),
+  portal: () => call<{ url: string }>("/v1/billing/portal", { body: {} }),
   parcelsAtPoint: (lng: number, lat: number, signal?: AbortSignal) =>
     call<ParcelsResponse>("/v1/parcels/at-point", { body: { lng, lat }, signal }),
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),

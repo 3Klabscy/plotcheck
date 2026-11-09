@@ -115,6 +115,32 @@ http://127.0.0.1:54324. The Row Level Security test runs against the local stack
 SUPABASE_TEST_URL=http://127.0.0.1:54321 SUPABASE_TEST_ANON_KEY=... SUPABASE_TEST_SERVICE_KEY=... npx vitest run apps/app/test/accounts.int.test.ts
 ```
 
+## Paid access (subscriptions and per-plot reports)
+
+Free: finding the plot, the zone and coefficients, restrictions and the summary of what can be
+built. Paid: every relaxation in detail, the finance and comparable sales, the option comparison,
+the PDF report and saving plots. Access comes from an active subscription or a one-off purchase of
+the plot (it stays unlocked). The API leaves the paid parts out of its answers for users without
+access, and saving is refused by the database (`supabase/migrations/20261111000000_billing.sql`).
+Prices are rows in `public.plans`; the ones shipped are **placeholders** to be set by the client.
+
+Providers (server-side secrets of the `api` function):
+
+- **Stripe** — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`; webhook endpoint
+  `https://<project>.supabase.co/functions/v1/api/v1/billing/webhook/stripe` with the events
+  `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+  `customer.subscription.created`, `customer.subscription.updated`,
+  `customer.subscription.deleted`. Turn on the customer portal in Stripe (cancel, card, invoices).
+  Optional: `STRIPE_AUTOMATIC_TAX=1` (Stripe Tax, VAT), `stripe_price_id` per plan.
+- **JCC** — `JCC_GATEWAY_URL`, `JCC_USERNAME`, `JCC_PASSWORD`, `API_PUBLIC_URL` (the function's
+  public URL, for the return from the JCC page). One-off report payments only. Written to the JCC
+  gateway's REST interface (`register.do`, `getOrderStatusExtended.do`) but **not yet tested** —
+  needs the merchant's JCC test credentials.
+- `APP_URL` — where users return after paying.
+
+Without `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` on the server, paid access is off and
+everything is open (development).
+
 ## Deploy (Supabase, EU region)
 
 1. Create the project in an EU region (e.g. Frankfurt) and link it:

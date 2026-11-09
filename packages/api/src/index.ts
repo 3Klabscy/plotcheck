@@ -14,9 +14,22 @@ import {
 } from "@plotcheck/country-sdk";
 import { cached, type Cache } from "./cache.ts";
 import { limitConcurrency, RateLimiter } from "./limits.ts";
+import { BillingError, createBilling } from "./billing.ts";
 
 export * from "./cache.ts";
 export * from "./limits.ts";
+export * from "./billing.ts";
+
+/** Free tier: the relaxations in detail and the finance are left out; a preview of the gain stays. */
+export function basicOnly(r: AnalysisResult): AnalysisResult & { relaxedPreview?: { gfaM2: number; floors: number; units?: number; gainM2: number } } {
+  const { relaxed: x, ...rest } = r;
+  if (!x) return rest;
+  return { ...rest, relaxedPreview: { gfaM2: x.figures.achievableGfaM2, floors: x.figures.feasibleFloors, ...(x.units ? { units: x.units.total } : {}), gainM2: x.gain.gfaM2 } };
+}
+
+class Redirect {
+  constructor(public location: string) {}
+}
 
 export interface ApiDeps {
   fetch: typeof fetch;
@@ -106,6 +119,7 @@ export function createApi(deps: ApiDeps) {
   const perClient = new RateLimiter(Number(deps.env("RATE_LIMIT_BURST") ?? 40), Number(deps.env("RATE_LIMIT_PER_SEC") ?? 0.5));
   const upstreamFetch = limitConcurrency(deps.fetch, Number(deps.env("UPSTREAM_CONCURRENCY") ?? 4));
   const ctx = (signal?: AbortSignal): ProviderContext => ({ fetch: upstreamFetch, env: deps.env, signal });
+  const billing = createBilling({ fetch: deps.fetch, env: deps.env });
   const allowedOrigins = (deps.env("ALLOWED_ORIGINS") ?? "http://localhost:8081,http://localhost:19006").split(",").map((s) => s.trim());
 
   // ---------- operations ----------
@@ -190,6 +204,18 @@ export function createApi(deps: ApiDeps) {
       };
     }
 
+    // ---------- billing ----------
+    if (req.method === "GET" && path === "/v1/billing/plans") {
+      const plans = await billing.plans();
+      return { enabled: billing.enabled, providers: billing.providers, plans: plans.map((p) => ({ id: p.id, kind: p.kind, name: p.name, description: p.description, price_cents: p.price_cents, currency: p.currency, interval: p.interval })) };
+    }
+    if (req.method === "GET" && path === "/v1/me/access") {
+      const c = url.searchParams.get("country") ?? undefined, r = url.searchParams.get("ref") ?? undefined;
+      return billing.access(req, c, r && r.length <= 60 ? r : undefined);
+    }
+    if (req.method === "POST" && path === "/v1/billing/webhook/stripe") return billing.stripeWebhook(req);
+    if (req.method === "GET" && path === "/v1/billing/jcc/return") return new Redirect((await billing.jccReturn(url)).redirect);
+
     if (req.method === "GET" && path === "/v1/plot-index") {
       const c = getCountry(url.searchParams.get("country") ?? "");
       const region = url.searchParams.get("region") ?? "";
@@ -220,6 +246,9 @@ export function createApi(deps: ApiDeps) {
 
     if (req.method !== "POST") throw new HttpError(405, "method_not_allowed");
     const b = body<Record<string, unknown>>(await req.json().catch(() => null));
+
+    if (path === "/v1/billing/checkout") return billing.checkout(req, b);
+    if (path === "/v1/billing/portal") return billing.portal(req);
 
     if (path === "/v1/parcels/at-point") {
       if (!isNum(b["lng"], -180, 180) || !isNum(b["lat"], -90, 90)) throw new HttpError(400, "invalid_point");
@@ -294,13 +323,17 @@ export function createApi(deps: ApiDeps) {
         if (!USE_TYPES.includes(useRaw as UseType)) throw new HttpError(400, "invalid_use");
         results = [analyse({ site, rules: z.primary.rules, use: useRaw as UseType, params, relaxations })];
       }
+      // paid parts only for users with a subscription or an unlock of this plot
+      const acc = await billing.access(req, country.code, parcel.nationalRef);
+      if (!acc.full) results = results.map(basicOnly);
       return {
+        access: { full: acc.full, signedIn: acc.signedIn, billing: acc.enabled },
         parcel,
         zone: z.primary.zone,
         otherZones: z.zones.slice(1),
         site: z.site,
         restrictions: z.restrictions,
-        finance: country.financeDefaults?.(parcel, z.primary.zone),
+        ...(acc.full ? { finance: country.financeDefaults?.(parcel, z.primary.zone) } : {}),
         coverage: z.primary.coverage,
         mismatches: z.primary.mismatches,
         rules: z.primary.rules,
@@ -316,7 +349,7 @@ export function createApi(deps: ApiDeps) {
     const origin = req.headers.get("Origin") ?? "";
     const cors: Record<string, string> = {
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization,apikey,x-client-info",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization,apikey,x-client-info,Stripe-Signature",
       Vary: "Origin",
     };
     if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) cors["Access-Control-Allow-Origin"] = origin || "*";
@@ -329,9 +362,12 @@ export function createApi(deps: ApiDeps) {
     if (!rl.ok) return json(429, { error: "rate_limited" }, { "Retry-After": String(rl.retryAfterS) });
 
     try {
-      return json(200, await route(req));
+      const out = await route(req);
+      if (out instanceof Redirect) return new Response(null, { status: 302, headers: { Location: out.location, ...cors } });
+      return json(200, out);
     } catch (e) {
       if (e instanceof HttpError) return json(e.status, { error: e.code, message: e.message });
+      if (e instanceof BillingError) return json(e.status, { error: e.code });
       if (e instanceof CountryNotSupportedError) return json(404, { error: "country_not_supported" });
       if (e instanceof AllProvidersFailedError) return json(502, { error: "upstream_unavailable", message: "The official data service did not respond. Please try again." });
       console.error("api error", e);

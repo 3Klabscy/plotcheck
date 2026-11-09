@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 const url = process.env["SUPABASE_TEST_URL"], anon = process.env["SUPABASE_TEST_ANON_KEY"], service = process.env["SUPABASE_TEST_SERVICE_KEY"];
 
 describe.runIf(!!(url && anon && service))("accounts (Supabase, Row Level Security)", () => {
-  const admin = createClient(url!, service!, { auth: { persistSession: false } });
+  let adminClient: ReturnType<typeof createClient> | undefined;
+  const admin = new Proxy({} as ReturnType<typeof createClient>, { get: (_t, k) => (adminClient ??= createClient(url!, service!, { auth: { persistSession: false } }))[k as keyof ReturnType<typeof createClient>] });
   const stamp = Date.now();
 
   async function userClient(name: string) {
@@ -24,6 +25,9 @@ describe.runIf(!!(url && anon && service))("accounts (Supabase, Row Level Securi
     const prof = await a.c.from("profiles").select("id, locale").single();
     expect(prof.data).toMatchObject({ id: a.id, locale: "el" });
 
+    // saving is part of the paid access: refused without it, allowed once the plot is unlocked
+    expect((await a.c.from("saved_plots").insert({ country_code: "CY", national_ref: "4000-40/56W1-3-1-666" })).error).not.toBeNull();
+    await admin.from("unlocks").insert({ user_id: a.id, country_code: "CY", national_ref: "4000-40/56W1-3-1-666", provider: "manual" } as never);
     const ins = await a.c.from("saved_plots").insert({ country_code: "CY", national_ref: "4000-40/56W1-3-1-666", label: "Τεμάχιο 666", note: "δίπλα στο σχολείο", comparables: [{ date: "2026-10-03", price: 212500, areaM2: 85, kind: "apartment" }] }).select().single();
     expect(ins.error).toBeNull();
     expect(ins.data.user_id).toBe(a.id);

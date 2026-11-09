@@ -14,6 +14,8 @@ import { kindForUse } from "../lib/comparables";
 import type { PriceChoice } from "../lib/options";
 import { AccountButton, SavedPlotsCard, SavePlotBar, SignInCard } from "../components/Account";
 import { useAccount, type SavedPlot } from "../lib/account";
+import { Paywall, SubscriptionLine } from "../components/Paywall";
+import type { AccessInfo } from "../lib/api";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -64,7 +66,7 @@ export default function Home() {
   const [showOptions, setShowOptions] = useState(false);
   const [mode, setMode] = useState<"map" | "details">("map");
   // Deep links: /?ref=<national ref> opens that plot; /?lng=33.615&lat=34.93&z=18 opens the map there.
-  const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string }>();
+  const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string; paid?: string }>();
   const linkView = useMemo(() => {
     const lngQ = Number(q.lng), latQ = Number(q.lat), zQ = Number(q.z ?? 18);
     return Number.isFinite(lngQ) && Number.isFinite(latQ) && q.lng && q.lat
@@ -174,6 +176,42 @@ export default function Home() {
       setStep("build");
     }
   }, [config, selected, run, t]);
+
+  // ---------- paid access ----------
+  /** Paid parts present (or billing not in force on this server). */
+  const full = !analysis?.access || analysis.access.full || !analysis.access.billing;
+  const [myAccess, setMyAccess] = useState<AccessInfo>();
+  const [payNotice, setPayNotice] = useState<"ok" | "waiting" | "cancel">();
+  useEffect(() => {
+    if (!acc.session) return setMyAccess(undefined);
+    api.access().then(setMyAccess).catch(() => undefined);
+  }, [acc.session]);
+  // signing in may bring access the analysis on screen did not have: load it again
+  const prevSession = useRef(acc.session?.user.id);
+  useEffect(() => {
+    const id = acc.session?.user.id;
+    if (id && id !== prevSession.current && analysis && !full) void confirm();
+    prevSession.current = id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acc.session?.user.id]);
+  // back from the payment page (?ref=…&paid=1): wait for the provider's confirmation, then open the full analysis
+  const paidHandled = useRef(false);
+  useEffect(() => {
+    if (paidHandled.current || !config || !selected || !zones || !q.paid || selected.nationalRef !== q.ref) return;
+    paidHandled.current = true;
+    if (q.paid !== "1") return setPayNotice("cancel");
+    setPayNotice("waiting");
+    void (async () => {
+      for (let i = 0; i < 12; i++) {
+        const a = await api.access(config.code, selected.nationalRef).catch(() => undefined);
+        if (a?.full) break;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      setPayNotice("ok");
+      await confirm();
+      api.access().then(setMyAccess).catch(() => undefined);
+    })();
+  }, [config, selected, zones, q.paid, q.ref, confirm]);
 
   // open a shared plot link once
   const openedRef = useRef(false);
@@ -364,6 +402,12 @@ export default function Home() {
         </Notice>
       )}
       {busy && <Loading label={busy} />}
+      <SubscriptionLine {...(myAccess ? { access: myAccess } : {})} />
+      {payNotice && (
+        <Notice tone={payNotice === "cancel" ? "warn" : "info"}>
+          <Text style={styles.body} testID="pay-notice">{t(`pay.notice.${payNotice}`)}</Text>
+        </Notice>
+      )}
       {signIn !== false && !acc.session && <SignInCard reason={signIn} onDone={() => setSignIn(false)} />}
 
       {step === "tap" && !busy && <SavedPlotsCard onOpen={(p) => void openSaved(p)} />}
@@ -495,7 +539,7 @@ export default function Home() {
             </View>
           )}
           {step === "parcel" && zone && !busy && <Button title={t("btn.confirm")} onPress={confirm} testID="confirm" />}
-          {zone && !busy && (
+          {zone && !busy && (full || savedCurrent) && (
             <SavePlotBar
               key={savedCurrent?.id ?? "new"}
               {...(savedCurrent ? { saved: savedCurrent } : {})}
@@ -534,13 +578,21 @@ export default function Home() {
               setStep("result");
             }}
           />
-          {step === "result" && (
+          {!full && selected && (
+            <Paywall
+              country={config.code}
+              nationalRef={selected.nationalRef}
+              {...((pv) => (pv ? { preview: pv } : {}))((result ?? analysis.results.find((r) => r.relaxedPreview))?.relaxedPreview)}
+              onNeedSignIn={(reason) => setSignIn(reason)}
+            />
+          )}
+          {full && step === "result" && (
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
               <View style={{ flex: 1 }}><Button title={`${showComp ? "▾" : "▸"} ${t("comp.short", { count: comparables.length })}`} kind="secondary" onPress={() => setShowComp((x) => !x)} testID="toggle-comp" /></View>
               <View style={{ flex: 1 }}><Button title={`${showOptions ? "▾" : "▸"} ${t("opt.short")}`} kind="secondary" onPress={() => setShowOptions((x) => !x)} testID="toggle-options" /></View>
             </View>
           )}
-          {(step === "build" || showComp) && (
+          {full && (step === "build" || showComp) && (
             <ComparablesCard
               sales={comparables}
               onChange={setComparables}
@@ -552,7 +604,7 @@ export default function Home() {
               countryCode={config.code}
             />
           )}
-          {(step === "build" || showOptions) && (
+          {full && (step === "build" || showOptions) && (
             <OptionsCompare
               data={analysis}
               priceFor={priceFor}
@@ -569,7 +621,7 @@ export default function Home() {
 
       {step === "result" && analysis && result && (
         <>
-          <Button title={reportBusy ? t("report.making") : t("report.download")} onPress={makeReport} disabled={reportBusy} testID="report-pdf" />
+          {full && <Button title={reportBusy ? t("report.making") : t("report.download")} onPress={makeReport} disabled={reportBusy} testID="report-pdf" />}
           <View style={{ height: 12 }} />
           <ResultView data={analysis} result={result} onFinance={setFinanceSnap} {...((p) => (p ? { marketPrice: p } : {}))(priceFor(result.use))} />
         </>
