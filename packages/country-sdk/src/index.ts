@@ -31,6 +31,8 @@ export interface ParcelProvider {
   getById(ctx: ProviderContext, id: PlotIdentifier): Promise<Parcel | null>;
   /** Plots matching partial identifiers (e.g. municipality + plot number, as the cadastre's search does). */
   search?(ctx: ProviderContext, id: PlotIdentifier, opts?: { limit?: number }): Promise<Parcel[]>;
+  /** Plots with this number inside a lat/lng box (the visible map). */
+  findInBox?(ctx: ProviderContext, plot: string, bbox: [number, number, number, number]): Promise<Parcel[]>;
 }
 
 export interface PlanningProvider {
@@ -177,6 +179,8 @@ export interface CountryModule {
   defaults: CountryDefaults;
   legal: LegalTexts;
   features: Partial<Record<FeatureFlag, boolean>>;
+  /** The national survey grid, for showing and importing coordinates (e.g. CGRS93 / LTM). */
+  nationalGrid?: import("@plotcheck/core").NationalGrid;
   /** Contour lines (GeoJSON) over a small lat/lng box, for the map. */
   contours?(ctx: ProviderContext, bbox: [number, number, number, number]): Promise<unknown>;
   /** Streets by name (address search). */

@@ -1,4 +1,4 @@
-import type { Parcel, SiteContext, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
+import type { NationalGrid, Parcel, SiteContext, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
 import type { AnalysisParams, AnalysisResult, FinanceParams } from "@plotcheck/engine";
 
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
@@ -28,6 +28,7 @@ export interface CountryConfig {
   bbox: [number, number, number, number];
   defaultView: { center: { lng: number; lat: number }; zoom: number };
   mapLayers: MapLayerDef[];
+  nationalGrid?: NationalGrid;
   messages: Record<string, Record<string, string>>;
   legal: { disclaimerKey: string; attributionKeys: string[] };
   coverage: { dist_abbr: string; planName: string; status: string }[];
@@ -129,6 +130,8 @@ export const api = {
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
   parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),
+  parcelsInBox: (country: string, plot: string, bbox: [number, number, number, number], signal?: AbortSignal) =>
+    call<{ country: string; parcels: Parcel[] }>("/v1/parcels/in-box", { body: { country, plot, bbox }, signal }),
   parcelsSearch: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/search", { body: { country, identifiers }, signal }),
   contours: (country: string, bbox: [number, number, number, number], signal?: AbortSignal) =>

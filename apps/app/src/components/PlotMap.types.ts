@@ -1,8 +1,9 @@
 import type { PolygonGeometry } from "@plotcheck/core";
 import type { MapLayerDef } from "../lib/api";
+import type { UserCollection } from "../lib/userLayer";
 
 export type MeasureTool = "none" | "distance" | "area";
-export interface MeasureResult { tool: Exclude<MeasureTool, "none">; points: number; lengthM: number; areaM2: number }
+export interface MeasureResult { tool: Exclude<MeasureTool, "none">; points: number; coords: [number, number][]; lengthM: number; areaM2: number }
 
 export interface PlotMapProps {
   layers: MapLayerDef[];
@@ -21,7 +22,11 @@ export interface PlotMapProps {
   onMeasure?(r: MeasureResult | null): void;
   onTap(p: { lng: number; lat: number }): void;
   onSelectNeighbour?(id: string): void;
-  onMove?(v: { lng: number; lat: number; zoom: number }): void;
+  onMove?(v: { lng: number; lat: number; zoom: number; bbox: [number, number, number, number] }): void;
+  /** The user's imported files and drawings. */
+  drawings?: UserCollection;
+  /** Text for the cursor position readout (e.g. national grid + lng/lat); none = hidden. */
+  formatCursor?(lng: number, lat: number): string;
   /** Contour lines for a view box (layer kind "contours"). */
   loadContours?(bbox: [number, number, number, number], signal: AbortSignal): Promise<GeoJSON.FeatureCollection>;
   /** Credit line for a layer's attribution key (already translated). */

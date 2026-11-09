@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import type { Parcel } from "@plotcheck/core";
+import type { NationalGrid, Parcel } from "@plotcheck/core";
+import { allPositions, feature, toDxf, toGeoJson, toKml, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MapLayerDef, MapLayerGroup } from "../lib/api";
 import { fmtArea, fmtNumber } from "../lib/format";
 import { colors } from "../theme";
@@ -73,7 +74,7 @@ const rowStyle = { flexDirection: "row" as const, alignItems: "center" as const,
 const rowText = { fontSize: 13, color: colors.ink, flex: 1 };
 
 /** Download a text file (web). On native this arrives with the store builds. */
-function download(name: string, mime: string, text: string) {
+export function download(name: string, mime: string, text: string) {
   if (Platform.OS !== "web") return;
   const url = URL.createObjectURL(new Blob([text], { type: mime }));
   const a = document.createElement("a");
@@ -100,11 +101,38 @@ export function plotGeoJson(p: Parcel): string {
   return JSON.stringify({ type: "FeatureCollection", features: [{ type: "Feature", properties: { nationalRef: p.nationalRef, label: p.label ?? null, officialAreaM2: p.officialAreaM2 ?? null, source: p.provenance.source }, geometry: p.geometry }] }, null, 1);
 }
 
-export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, layersOpen, onLayers }: { measure: MeasureTool; onMeasure(t: MeasureTool): void; onClear(): void; result: MeasureResult | null; plot?: Parcel; shareUrl(): string; layersOpen: boolean; onLayers(): void }) {
+const plotFeature = (p: Parcel): UserFeature => {
+  const g = p.geometry;
+  const rings = (g.type === "Polygon" ? g.coordinates : g.coordinates[0] ?? []) as [number, number][][];
+  return feature({ type: "Polygon", coordinates: rings }, p.label ?? p.nationalRef, "drawing", p.nationalRef);
+};
+
+export interface ToolbarProps {
+  measure: MeasureTool;
+  onMeasure(t: MeasureTool): void;
+  onClear(): void;
+  result: MeasureResult | null;
+  plot?: Parcel;
+  shareUrl(): string;
+  layersOpen: boolean;
+  onLayers(): void;
+  grid?: NationalGrid;
+  onImport(): void;
+  drawingsCount: number;
+  drawingsOpen: boolean;
+  onDrawings(): void;
+  onSaveMeasure(): void;
+  onFindInView(plot: string): Promise<string | undefined>;
+}
+
+export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, layersOpen, onLayers, grid, onImport, drawingsCount, drawingsOpen, onDrawings, onSaveMeasure, onFindInView }: ToolbarProps) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const [copied, setCopied] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState("");
+  const [findMsg, setFindMsg] = useState<string>();
   const share = async () => {
     const url = shareUrl();
     try {
@@ -116,26 +144,53 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
       /* user cancelled */
     }
   };
+  const find = async () => {
+    if (!findText.trim()) return;
+    setFindMsg(t("loading.parcel"));
+    const err = await onFindInView(findText.trim());
+    setFindMsg(err ? t(`error.${err}`, { defaultValue: t("error.generic") }) : undefined);
+    if (!err) setFindOpen(false);
+  };
   const name = plot ? plot.nationalRef.replace(/[^\w-]+/g, "_") : "plot";
+  const minPts = measure === "area" ? 3 : 1;
   return (
     <>
       <View style={{ position: "absolute", left: 10, top: 10, right: 52, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
         <Pressable testID="btn-layers" onPress={onLayers} style={chip(layersOpen)}><Text style={chipText(layersOpen)}>☰ {t("map.layers")}</Text></Pressable>
+        <Pressable testID="btn-find" onPress={() => setFindOpen((o) => !o)} style={chip(findOpen)}><Text style={chipText(findOpen)}>🔎 {t("map.findHere")}</Text></Pressable>
         {(["distance", "area"] as const).map((m) => (
           <Pressable key={m} testID={`tool-${m}`} onPress={() => onMeasure(measure === m ? "none" : m)} style={chip(measure === m)}>
             <Text style={chipText(measure === m)}>{m === "distance" ? "📏" : "▱"} {t(`map.tool.${m}`)}</Text>
           </Pressable>
         ))}
+        <Pressable testID="tool-import" onPress={onImport} style={chip(false)}><Text style={chipText(false)}>⤒ {t("map.import")}</Text></Pressable>
+        {drawingsCount > 0 && (
+          <Pressable testID="btn-drawings" onPress={onDrawings} style={chip(drawingsOpen)}><Text style={chipText(drawingsOpen)}>✎ {t("map.drawings", { count: drawingsCount })}</Text></Pressable>
+        )}
         <Pressable testID="tool-share" onPress={share} style={chip(copied)}><Text style={chipText(copied)}>🔗 {copied ? t("map.copied") : t("map.share")}</Text></Pressable>
         {plot && (
           <Pressable testID="tool-export" onPress={() => setExportOpen((o) => !o)} style={chip(exportOpen)}><Text style={chipText(exportOpen)}>⤓ {t("map.export")}</Text></Pressable>
         )}
       </View>
+      {findOpen && (
+        <View testID="find-box" style={{ position: "absolute", left: 10, top: 48, width: 260, backgroundColor: colors.panel, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 10 }}>
+          <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>{t("map.findHereHint")}</Text>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <TextInput testID="find-plot" value={findText} onChangeText={setFindText} onSubmitEditing={find} inputMode="numeric" placeholder={t("search.plotHint")}
+              style={{ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 14 }} />
+            <Pressable testID="find-go" onPress={find} style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, justifyContent: "center" }}>
+              <Text style={{ color: "#fff", fontWeight: "700" }}>→</Text>
+            </Pressable>
+          </View>
+          {findMsg && <Text testID="find-msg" style={{ fontSize: 12, color: colors.maybe, marginTop: 6 }}>{findMsg}</Text>}
+        </View>
+      )}
       {exportOpen && plot && (
         <View style={{ position: "absolute", right: 52, top: 48, backgroundColor: colors.panel, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 6 }}>
           {[
             { id: "kml", label: "KML (Google Earth)", run: () => download(`${name}.kml`, "application/vnd.google-earth.kml+xml", plotKml(plot)) },
             { id: "geojson", label: "GeoJSON", run: () => download(`${name}.geojson`, "application/geo+json", plotGeoJson(plot)) },
+            ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`${name}.dxf`, "application/dxf", toDxf({ type: "FeatureCollection", features: [plotFeature(plot)] }, grid)) }] : []),
           ].map((x) => (
             <Pressable key={x.id} testID={`export-${x.id}`} onPress={() => { x.run(); setExportOpen(false); }} style={{ paddingVertical: 8, paddingHorizontal: 10 }}>
               <Text style={{ fontSize: 13, color: colors.ink }}>{x.label}</Text>
@@ -144,7 +199,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
         </View>
       )}
       {measure !== "none" && (
-        <View testID="measure-box" style={{ position: "absolute", left: 10, bottom: 28, backgroundColor: "rgba(255,255,255,0.96)", borderRadius: 10, padding: 10, minWidth: 200, borderWidth: 1, borderColor: "#7B2FF7" }}>
+        <View testID="measure-box" style={{ position: "absolute", left: 10, bottom: 28, backgroundColor: "rgba(255,255,255,0.96)", borderRadius: 10, padding: 10, minWidth: 220, borderWidth: 1, borderColor: "#7B2FF7" }}>
           {!result || result.points < (measure === "area" ? 3 : 2) ? (
             <Text style={{ fontSize: 12, color: colors.muted }}>{t(`map.tool.${measure}Hint`)}</Text>
           ) : (
@@ -155,12 +210,51 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
               </Text>
             </>
           )}
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 6 }}>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+            {result && result.points >= minPts && (
+              <Pressable testID="measure-save" onPress={onSaveMeasure}><Text style={{ fontSize: 12, color: "#0284C7", fontWeight: "700" }}>{t("map.saveDrawing")}</Text></Pressable>
+            )}
             <Pressable testID="measure-clear" onPress={onClear}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.clear")}</Text></Pressable>
             <Pressable testID="measure-done" onPress={() => onMeasure("none")}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.done")}</Text></Pressable>
           </View>
         </View>
       )}
     </>
+  );
+}
+
+export function DrawingsPanel({ drawings, grid, onDelete, onClearAll, onZoom, onClose }: { drawings: UserCollection; grid?: NationalGrid; onDelete(id: string): void; onClearAll(): void; onZoom(f: UserFeature): void; onClose(): void }) {
+  const { t } = useTranslation();
+  const kind = (f: UserFeature) => t(`map.geom.${f.geometry.type}`);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return (
+    <View testID="drawings-panel" style={{ position: "absolute", left: 10, top: 48, width: 300, maxHeight: "75%", backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 10 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 }}>
+        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>{t("map.myDrawings")}</Text>
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("map.close")} testID="drawings-close"><Text style={{ fontSize: 18, color: colors.muted }}>✕</Text></Pressable>
+      </View>
+      <ScrollView style={{ paddingHorizontal: 14 }} contentContainerStyle={{ paddingBottom: 8 }}>
+        {drawings.features.map((f) => (
+          <View key={f.id} testID={`drawing-${f.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.line }}>
+            <Pressable style={{ flex: 1 }} onPress={() => onZoom(f)}>
+              <Text style={{ fontSize: 13, color: colors.ink }} numberOfLines={1}>{f.properties.name || kind(f)}</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>{kind(f)} · {t(`map.from.${f.properties.source}`)} · {allPositions(f.geometry).length} {t("map.vertices")}</Text>
+            </Pressable>
+            <Pressable onPress={() => onDelete(f.id)} accessibilityLabel={t("map.delete")}><Text style={{ color: colors.notAllowed, fontSize: 15 }}>🗑</Text></Pressable>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12, borderTopWidth: 1, borderColor: colors.line }}>
+        <Text style={{ fontSize: 12, color: colors.muted, width: "100%" }}>{t("map.exportAll")}</Text>
+        {[
+          { id: "kml", label: "KML", run: () => download(`plotcheck-${stamp}.kml`, "application/vnd.google-earth.kml+xml", toKml(drawings, "PlotCheck")) },
+          { id: "geojson", label: "GeoJSON", run: () => download(`plotcheck-${stamp}.geojson`, "application/geo+json", toGeoJson(drawings)) },
+          ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`plotcheck-${stamp}.dxf`, "application/dxf", toDxf(drawings, grid)) }] : []),
+        ].map((x) => (
+          <Pressable key={x.id} testID={`drawings-export-${x.id}`} onPress={x.run} style={chip(false)}><Text style={chipText(false)}>{x.label}</Text></Pressable>
+        ))}
+        <Pressable testID="drawings-clear" onPress={onClearAll} style={{ paddingVertical: 6 }}><Text style={{ fontSize: 12, color: colors.notAllowed, fontWeight: "600" }}>{t("map.clearAll")}</Text></Pressable>
+      </View>
+    </View>
   );
 }

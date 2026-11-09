@@ -5,7 +5,9 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
-import { LayerPanel, MapToolbar } from "../components/MapControls";
+import { DrawingsPanel, LayerPanel, MapToolbar } from "../components/MapControls";
+import { toGrid } from "@plotcheck/core";
+import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
 import { ResultView, UseOptions, reasonText } from "../components/Result";
 import { Button, Card, Loading, Notice, Row, SectionTitle, styles } from "../components/ui";
@@ -41,7 +43,9 @@ export default function Home() {
   const [measureReset, setMeasureReset] = useState(0);
   const [measured, setMeasured] = useState<MeasureResult | null>(null);
   const [candidates, setCandidates] = useState(false);
-  const view = useRef<{ lng: number; lat: number; zoom: number } | undefined>(undefined);
+  const view = useRef<{ lng: number; lat: number; zoom: number; bbox: [number, number, number, number] } | undefined>(undefined);
+  const [drawings, setDrawings] = useState<UserCollection>({ type: "FeatureCollection", features: [] });
+  const [drawingsOpen, setDrawingsOpen] = useState(false);
   const [mode, setMode] = useState<"map" | "details">("map");
   // Deep links: /?ref=<national ref> opens that plot; /?lng=33.615&lat=34.93&z=18 opens the map there.
   const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string }>();
@@ -163,6 +167,74 @@ export default function Home() {
     return v ? `${base}?lng=${v.lng.toFixed(6)}&lat=${v.lat.toFixed(6)}&z=${v.zoom.toFixed(1)}` : base;
   };
 
+  const fitFeatures = (fs: UserFeature[]) => {
+    const pts = fs.flatMap((f) => allPositions(f.geometry));
+    if (pts.length === 0) return;
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const pad = 0.0003;
+    mapRef.current?.fitBounds([Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad]);
+  };
+
+  const importDrawings = () => {
+    if (typeof document === "undefined") return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".geojson,.json,.kml,.dxf";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (file.size > 5_000_000) return setError("import_too_large");
+      try {
+        const fs = importFile(file.name, await file.text(), config?.nationalGrid);
+        setDrawings((d) => ({ ...d, features: [...d.features, ...fs] }));
+        setDrawingsOpen(true);
+        setError(null);
+        fitFeatures(fs);
+      } catch (e) {
+        setError(e instanceof ImportError ? `import_${e.message}` : "import_bad_file");
+      }
+    };
+    input.click();
+  };
+
+  const saveMeasure = () => {
+    const c = measured?.coords ?? [];
+    const geom = measure === "area" && c.length >= 3 ? { type: "Polygon" as const, coordinates: [[...c, c[0]!]] } : c.length === 1 ? { type: "Point" as const, coordinates: c[0]! } : { type: "LineString" as const, coordinates: c };
+    const n = drawings.features.filter((f) => f.properties.source === "drawing").length + 1;
+    setDrawings((d) => ({ ...d, features: [...d.features, feature(geom, `${t(`map.geom.${geom.type}`)} ${n}`, "drawing")] }));
+    setMeasureReset((x) => x + 1);
+  };
+
+  const findInView = async (plot: string): Promise<string | undefined> => {
+    const v = view.current;
+    if (!config || !v) return "generic";
+    if (v.zoom < 13) return "zoom_in";
+    try {
+      const r = await api.parcelsInBox(config.code, plot, v.bbox);
+      if (r.parcels.length === 0) return "parcel_not_found_here";
+      setTapped(undefined);
+      setParcels(r.parcels);
+      if (r.parcels.length === 1) {
+        setCandidates(false);
+        void selectParcel(r.parcels[0]!);
+      } else {
+        setStep("tap");
+        setSelectedRef(undefined);
+        setCandidates(true);
+      }
+      return undefined;
+    } catch (e) {
+      return e instanceof ApiError ? e.code : "generic";
+    }
+  };
+
+  const grid = config?.nationalGrid;
+  const fmtGrid = (lng: number, lat: number) => {
+    if (!grid) return "";
+    const [e, n] = toGrid(grid, lng, lat);
+    return `E ${e.toFixed(2)}  N ${n.toFixed(2)}`;
+  };
+
   if (!config) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, padding: 24 }}>
@@ -249,6 +321,13 @@ export default function Home() {
           )}
           <Row label={t("plot.ref")} value={selected.nationalRef} />
           {selected.officialAreaM2 !== undefined && <Row label={t("plot.area")} value={fmtArea(selected.officialAreaM2, lng)} />}
+          {grid && (() => {
+            const ring = (selected.geometry.type === "Polygon" ? selected.geometry.coordinates[0] : selected.geometry.coordinates[0]?.[0]) ?? [];
+            const pts = ring.slice(0, -1);
+            if (pts.length === 0) return null;
+            const c = [pts.reduce((a, p) => a + p[0]!, 0) / pts.length, pts.reduce((a, p) => a + p[1]!, 0) / pts.length] as const;
+            return <Row label={t("plot.coords", { grid: grid.name })} value={fmtGrid(c[0], c[1])} />;
+          })()}
           {zones?.site && (
             <>
               {zones.site.frontage.filter((f) => f.name).map((f) => (
@@ -390,6 +469,8 @@ export default function Home() {
         onMeasure={setMeasured}
         onMove={(v) => (view.current = v)}
         loadContours={(bbox, signal) => api.contours(config.code, bbox, signal)}
+        drawings={drawings}
+        formatCursor={(x, y) => `${grid ? `${grid.name}  ${fmtGrid(x, y)}  ·  ` : ""}${y.toFixed(6)}, ${x.toFixed(6)}`}
         onTap={(p) => {
           setCandidates(false);
           void onTap(p);
@@ -408,8 +489,25 @@ export default function Home() {
         plot={step !== "tap" ? selected : undefined}
         shareUrl={shareUrl}
         layersOpen={layersOpen}
-        onLayers={() => setLayersOpen((o) => !o)}
+        onLayers={() => { setLayersOpen((o) => !o); setDrawingsOpen(false); }}
+        grid={grid}
+        onImport={importDrawings}
+        drawingsCount={drawings.features.length}
+        drawingsOpen={drawingsOpen}
+        onDrawings={() => { setDrawingsOpen((o) => !o); setLayersOpen(false); }}
+        onSaveMeasure={saveMeasure}
+        onFindInView={findInView}
       />
+      {drawingsOpen && drawings.features.length > 0 && (
+        <DrawingsPanel
+          drawings={drawings}
+          grid={grid}
+          onDelete={(id) => setDrawings((d) => ({ ...d, features: d.features.filter((f) => f.id !== id) }))}
+          onClearAll={() => { setDrawings({ type: "FeatureCollection", features: [] }); setDrawingsOpen(false); }}
+          onZoom={(f) => fitFeatures([f])}
+          onClose={() => setDrawingsOpen(false)}
+        />
+      )}
       {layersOpen && (
         <LayerPanel
           layers={config.mapLayers}

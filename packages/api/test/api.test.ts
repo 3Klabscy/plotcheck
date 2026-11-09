@@ -74,4 +74,12 @@ describe("plot search", () => {
     expect((await get("1,2,3")).status).toBe(400);
     expect((await get("33.6,34.9,33.7,35.0")).status).toBe(400);
   });
+  it("finds a plot number inside the visible map and exposes the national grid", async () => {
+    const r = await (await post("/v1/parcels/in-box", { country: "CY", plot: "666", bbox: [33.61, 34.925, 33.62, 34.935] })).json();
+    expect(r.parcels.length).toBeGreaterThan(0);
+    expect((await post("/v1/parcels/in-box", { country: "CY", plot: "666", bbox: [32, 34, 34, 36] })).status).toBe(400);
+    expect((await post("/v1/parcels/in-box", { country: "CY", plot: "", bbox: [33.61, 34.925, 33.62, 34.935] })).status).toBe(400);
+    const c = await (await api(new Request("http://x/v1/countries"))).json();
+    expect(c.countries[0].nationalGrid.epsg).toBe(6312);
+  });
 });

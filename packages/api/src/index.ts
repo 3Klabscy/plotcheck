@@ -179,6 +179,7 @@ export function createApi(deps: ApiDeps) {
           bbox: c.bbox,
           defaultView: c.defaultView,
           mapLayers: c.mapLayers,
+          ...(c.nationalGrid ? { nationalGrid: c.nationalGrid } : {}),
           messages: c.messages,
           plotIdFields: c.plotIdSchema.fields,
           features: c.features,
@@ -241,6 +242,18 @@ export function createApi(deps: ApiDeps) {
       if (!ref) throw new HttpError(400, "invalid_identifiers");
       const parcel = await parcelByRef(country, ref, req.signal);
       return { country: country.code, parcels: [parcel] };
+    }
+
+    if (path === "/v1/parcels/in-box") {
+      const plot = typeof b["plot"] === "string" ? b["plot"].trim() : "";
+      const bb = b["bbox"];
+      if (!plot || plot.length > 20) throw new HttpError(400, "invalid_identifiers");
+      if (!Array.isArray(bb) || bb.length !== 4 || !bb.every((x) => typeof x === "number" && Number.isFinite(x))) throw new HttpError(400, "invalid_bbox");
+      const box = bb as [number, number, number, number];
+      if (box[2] - box[0] > 0.2 || box[3] - box[1] > 0.2 || box[2] <= box[0] || box[3] <= box[1]) throw new HttpError(400, "bbox_too_large");
+      const prov = country.parcelProviders.find((p) => p.enabled && p.findInBox);
+      if (!prov) throw new HttpError(404, "search_not_supported");
+      return { country: country.code, parcels: await prov.findInBox!(ctx(req.signal), plot, box) };
     }
 
     if (path === "/v1/parcels/search") {

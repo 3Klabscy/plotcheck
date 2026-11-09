@@ -34,6 +34,14 @@ export const cyprus: CountryModule = {
   financeDefaults: cyFinanceDefaults,
   streetSearch: larnacaStreetSearch,
   contours: cyContours,
+  // CGRS93 / Cyprus LTM (EPSG:6312). Datum shift = EPSG:7721 reversed (coordinate frame), which is what
+  // the DLS GeometryServer applies by default (ESRI 108128/108129); checked to < 5 mm, 2026-11-09.
+  nationalGrid: {
+    name: "CGRS93 / LTM",
+    epsg: 6312,
+    tm: { lon0: 33, lat0: 0, k0: 0.99995, falseEasting: 200000, falseNorthing: -3500000, a: 6378137, invF: 298.257223563 },
+    toDatum: { tx: -8.846, ty: 4.394, tz: 1.122, rx: -0.00237, ry: -0.146528, rz: 0.130428, ds: -0.783926, convention: "coordinate_frame" },
+  },
   coverage: [{ dist_abbr: "Κα4", planName: "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ", status: "curated" }],
   defaults: {
     storeyHeightM: 3.2,

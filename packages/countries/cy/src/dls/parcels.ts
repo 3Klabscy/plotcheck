@@ -105,6 +105,8 @@ export const dlsRestParcels: ParcelProvider = {
     return first ? toParcel(first, fetchedAt, this.id, restSource, restRef(first.gmlId)) : null;
   },
 
+  findInBox: (ctx, plot, bbox) => dlsFindInBox(ctx, plot, bbox),
+
   /** As the DLS portal's "by plot" search: municipality + plot number, optionally quarter/sheet/block. */
   async search(ctx, id, opts) {
     const where = searchWhere(id);
@@ -114,6 +116,15 @@ export const dlsRestParcels: ParcelProvider = {
     const fetchedAt = (ctx.now?.() ?? new Date()).toISOString();
     return parseRestParcels(await dlsGet(ctx, url, 20_000)).map((r) => toParcel(r, fetchedAt, this.id, restSource, restRef(r.gmlId)));
   },
+};
+
+export const dlsFindInBox: NonNullable<import("@plotcheck/country-sdk").ParcelProvider["findInBox"]> = async (ctx, plot, bbox) => {
+  if (!PART.test(plot.trim())) return [];
+  const url =
+    `${MAPSERVER}/${PARCEL_LAYER}/query?where=${encodeURIComponent(`label='${plot.trim()}'`)}&geometry=${bbox.map((v) => v.toFixed(7)).join(",")}` +
+    `&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${REST_FIELDS}&returnGeometry=true&outSR=4326&resultRecordCount=20&f=geojson`;
+  const fetchedAt = (ctx.now?.() ?? new Date()).toISOString();
+  return parseRestParcels(await dlsGet(ctx, url, 15_000)).map((r) => toParcel(r, fetchedAt, "cy.dls.rest.cp", restSource, restRef(r.gmlId)));
 };
 
 const PART = /^[0-9A-Za-z/.]{1,20}$/;

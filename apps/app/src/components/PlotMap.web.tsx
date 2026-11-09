@@ -61,6 +61,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     fitBounds: (b) => map.current?.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom: 18, duration: 600 }),
   }));
   const measurePts = useRef<[number, number][]>([]);
+  const cursorBox = useRef<HTMLDivElement | null>(null);
 
   // create once
   useEffect(() => {
@@ -116,6 +117,10 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       m.addLayer({ id: "selected-line", type: "line", source: "selected", paint: { "line-color": colors.plot, "line-width": 3 } });
       m.addLayer({ id: "footprint-fill", type: "fill", source: "footprint", paint: { "fill-color": colors.footprint, "fill-opacity": 0.45 } });
       m.addLayer({ id: "footprint-line", type: "line", source: "footprint", paint: { "line-color": colors.footprint, "line-width": 2 } });
+      m.addSource("user", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({ id: "user-fill", type: "fill", source: "user", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#0284C7", "fill-opacity": 0.12 } });
+      m.addLayer({ id: "user-line", type: "line", source: "user", filter: ["!=", "$type", "Point"], paint: { "line-color": "#0284C7", "line-width": 2.2 } });
+      m.addLayer({ id: "user-pts", type: "circle", source: "user", filter: ["==", "$type", "Point"], paint: { "circle-radius": 5, "circle-color": "#0284C7", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
       m.addSource("measure", { type: "geojson", data: measureFc([], false) });
       m.addLayer({ id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#7B2FF7", "fill-opacity": 0.15 } });
       m.addLayer({ id: "measure-line", type: "line", source: "measure", filter: ["!=", "$type", "Point"], paint: { "line-color": "#7B2FF7", "line-width": 2.5, "line-dasharray": [3, 1.5] } });
@@ -123,9 +128,14 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       loaded.current = true;
       sync();
     });
-    m.on("moveend", () => {
+    const reportView = () => {
       const c = m.getCenter();
-      latest.current.onMove?.({ lng: c.lng, lat: c.lat, zoom: m.getZoom() });
+      const bb = m.getBounds();
+      latest.current.onMove?.({ lng: c.lng, lat: c.lat, zoom: m.getZoom(), bbox: [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()] });
+    };
+    m.once("load", reportView);
+    m.on("moveend", () => {
+      reportView();
       refreshContours();
     });
     m.on("click", (e) => {
@@ -140,6 +150,14 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       if (id && latest.current.onSelectNeighbour) latest.current.onSelectNeighbour(id);
       else latest.current.onTap({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     });
+    m.on("mousemove", (e) => {
+      const fmt = latest.current.formatCursor, box = cursorBox.current;
+      if (!box) return;
+      if (!fmt) { box.style.display = "none"; return; }
+      box.style.display = "block";
+      box.textContent = fmt(e.lngLat.lng, e.lngLat.lat);
+    });
+    m.on("mouseout", () => { if (cursorBox.current) cursorBox.current.style.display = "none"; });
     m.on("mouseenter", "neighbours-fill", () => (m.getCanvas().style.cursor = "pointer"));
     m.on("mouseleave", "neighbours-fill", () => (m.getCanvas().style.cursor = ""));
     map.current = m;
@@ -158,6 +176,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     (m.getSource("selected") as GeoJSONSource).setData(fc(p.selected ? [{ geometry: p.selected }] : []));
     (m.getSource("neighbours") as GeoJSONSource).setData(fc(p.neighbours ?? []));
     (m.getSource("footprint") as GeoJSONSource).setData(fc(p.footprint ? [{ geometry: p.footprint }] : []));
+    (m.getSource("user") as GeoJSONSource).setData((p.drawings ?? { type: "FeatureCollection", features: [] }) as never);
     const base = p.basemap;
     m.setLayoutProperty("streets", "visibility", base === "streets" ? "visible" : "none");
     for (const l of p.layers) {
@@ -199,10 +218,10 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     const pts = measurePts.current;
     (m.getSource("measure") as GeoJSONSource).setData(measureFc(pts, tool === "area"));
     if (tool === "none" || pts.length === 0) return latest.current.onMeasure?.(null);
-    latest.current.onMeasure?.({ tool, points: pts.length, lengthM: pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0 });
+    latest.current.onMeasure?.({ tool, points: pts.length, coords: [...pts], lengthM: pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0 });
   }
 
-  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure]);
+  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure, props.drawings]);
   useEffect(refreshContours, [props.overlays]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     measurePts.current = [];
@@ -215,5 +234,14 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     if (props.selected && map.current) map.current.fitBounds(bounds(props.selected), { padding: 80, maxZoom: 19, duration: 600 });
   }, [props.selected]);
 
-  return <div ref={el} style={{ position: "absolute", inset: 0 }} data-testid="plot-map" />;
+  return (
+    <>
+      <div ref={el} style={{ position: "absolute", inset: 0 }} data-testid="plot-map" />
+      <div
+        ref={cursorBox}
+        data-testid="cursor-coords"
+        style={{ position: "absolute", right: 10, bottom: 34, display: "none", pointerEvents: "none", background: "rgba(255,255,255,0.92)", borderRadius: 6, padding: "3px 7px", fontSize: 11, fontFamily: "ui-monospace, Menlo, monospace", color: colors.ink }}
+      />
+    </>
+  );
 });
