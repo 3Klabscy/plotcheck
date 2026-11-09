@@ -37,7 +37,7 @@ data the client has permission to use (DLS road map, Cyprus Post).
 | White zones, listed buildings, green/community spaces, state land | ⏳ Not found on DLS INSPIRE; need the Town Planning Department's data |
 | Dam protection zones, bird corridors, HV power lines | ⏳ Source to be found |
 | Google / Bing / Esri satellite | ✗ Licence does not allow this use; the DLS orthophotos are better locally |
-| Contour lines | ⏳ DLS EL1 is only a tile index; contours need the DTM (DLS permission) |
+| Contour lines | ✅ From the DLS DTM 2019 (open download, CC BY-SA 4.0), worked out by the server for the view (zoom ≥ 16), interval chosen by relief (0.5–100 m), labels every 5th line. Hillshade 1993 layer too |
 
 ## Tools
 
@@ -52,3 +52,5 @@ data the client has permission to use (DLS road map, Cyprus Post).
 | Coordinates in CGRS 1993 | ⏳ Needs the official datum transformation (EPSG:6312) and a check against DLS points |
 | Assessed value and building coefficient | ✅ Building coefficients per plot. DLS General Valuation 2021 per area and zone in Finance. ⏳ Per-plot value needs the DLS eServices |
 | Survey plan sheets | ⏳ |
+| Ground elevation of the plot | ✅ DLS DTM 2019 (1 m) → 2014 → 1993 (5 m) |
+| What stands on the plot (buildings/trees, height) | ✅ DLS DSM 2019 − DTM 2019 inside the plot (buildings and trees not told apart) |

@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Parcel } from "@plotcheck/core";
 import type { ProviderContext } from "@plotcheck/country-sdk";
-import { dtmTilesAt, groundElevation, larnacaAirport, lzwDecode, readPixel } from "../src/index.ts";
-import { cyPlotElevation } from "../src/site.ts";
+import { chooseInterval, contourLines, dtmTilesAt, groundElevation, larnacaAirport, lzwDecode, readPixel } from "../src/index.ts";
+import { cyPlotElevation, cyPlotStructures } from "../src/site.ts";
 
 const fx = (n: string) => readFileSync(new URL(`./fixtures/${n}`, import.meta.url));
 
@@ -121,5 +121,42 @@ describe("ground elevation and the airport height limit", () => {
     expect(ols.params?.["ground"]).toBe(6);
     const altitude = ols.params?.["altitude"] as number;
     expect(ols.effect).toEqual({ type: "cap_height", maxHeightM: Math.floor((altitude - 6) * 10) / 10 });
+  });
+});
+
+describe("contours", () => {
+  it("traces a level through a sloping grid and joins the pieces into one line", () => {
+    // 6 × 4 grid rising 1 m per column eastwards: the 2.5 m contour is one north–south line
+    const g = { cols: 6, rows: 4, x0: 0, y0: 4, dx: 1, dy: 1, values: new Float32Array(24).map((_, i) => i % 6) };
+    const lines = contourLines(g, [2.5]).get(2.5)!;
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!).toHaveLength(4);
+    for (const [x] of lines[0]!) expect(x).toBeCloseTo(2.5, 6);
+  });
+  it("skips cells without data", () => {
+    const vals = new Float32Array(24).map((_, i) => i % 6);
+    vals[2] = NaN;
+    const lines = contourLines({ cols: 6, rows: 4, x0: 0, y0: 4, dx: 1, dy: 1, values: vals }, [2.5]).get(2.5)!;
+    expect(lines.flat().length).toBe(3);
+  });
+  it("chooses a readable interval for the relief", () => {
+    expect(chooseInterval(5, 15)).toBe(0.5);
+    expect(chooseInterval(300, 340)).toBe(2);
+    expect(chooseInterval(0, 1900)).toBe(100);
+  });
+});
+
+describe("what stands on the plot (DSM − DTM)", () => {
+  // ground 10 m everywhere; surface 18 m (an 8 m building) on the western half of the box
+  const dtm = makeTiff({ x0: 33.61, y0: 34.94, px: 0.00001, w: 40, h: 40, value: () => 10 });
+  const dsm = makeTiff({ x0: 33.61, y0: 34.94, px: 0.00001, w: 40, h: 40, value: (c) => (c < 20 ? 18 : 10.3) });
+  const ctx: ProviderContext = { fetch: rangeFetch((u) => (u.includes("/2019_DSM/") ? dsm : u.includes("/2019_DTM/") ? dtm : undefined)), env: () => undefined };
+  it("measures the raised area and its height inside the plot", async () => {
+    const d = 0.0004;
+    const plot = { geometry: { type: "Polygon", coordinates: [[[33.61, 34.94 - d], [33.61 + d, 34.94 - d], [33.61 + d, 34.94], [33.61, 34.94], [33.61, 34.94 - d]]] } } as unknown as Parcel;
+    const s = (await cyPlotStructures(ctx, plot))!;
+    expect(s.raisedShare).toBeGreaterThan(0.4);
+    expect(s.raisedShare).toBeLessThan(0.6);
+    expect(s.maxHeightM).toBeCloseTo(8, 1);
   });
 });

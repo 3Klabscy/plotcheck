@@ -198,6 +198,19 @@ export function createApi(deps: ApiDeps) {
       return idx;
     }
 
+    if (req.method === "GET" && path === "/v1/contours") {
+      const c = getCountry(url.searchParams.get("country") ?? "");
+      const b = (url.searchParams.get("bbox") ?? "").split(",").map(Number);
+      if (b.length !== 4 || b.some((x) => !Number.isFinite(x)) || b[2]! <= b[0]! || b[3]! <= b[1]!) throw new HttpError(400, "invalid_bbox");
+      if (b[2]! - b[0]! > 0.012 || b[3]! - b[1]! > 0.01) throw new HttpError(400, "bbox_too_large");
+      if (!c.contours) throw new HttpError(404, "contours_not_supported");
+      // snap to a ~250 m grid so neighbouring requests share the cache
+      const q = 0.0025;
+      const box: [number, number, number, number] = [Math.floor(b[0]! / q) * q, Math.floor(b[1]! / q) * q, Math.ceil(b[2]! / q) * q, Math.ceil(b[3]! / q) * q];
+      const { value } = await cached(deps.cache, `contours:${c.code}:${box.map((x) => x.toFixed(4)).join(",")}`, TTL.zones, async () => (await c.contours!(ctx(req.signal), box)) ?? { type: "FeatureCollection", features: [] });
+      return value;
+    }
+
     if (req.method === "GET" && path === "/v1/streets") {
       const c = getCountry(url.searchParams.get("country") ?? "");
       const q = (url.searchParams.get("q") ?? "").slice(0, 60);

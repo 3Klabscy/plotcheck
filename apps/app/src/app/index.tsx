@@ -255,6 +255,12 @@ export default function Home() {
                 <Row key={f.name!} label={t("plot.frontage")} value={`${f.name} · ${fmtNumber(f.lengthM, lng)} m`} />
               ))}
               {zones.site.postcodes.length > 0 && <Row label={t("plot.postcode")} value={zones.site.postcodes.join(" / ")} />}
+              {zones.site.structures && (
+                <Row
+                  label={t("plot.structures")}
+                  value={zones.site.structures.raisedShare < 0.03 ? t("plot.structuresNone") : t("plot.structuresValue", { area: fmtArea(zones.site.structures.raisedM2, lng), share: fmtPercent(zones.site.structures.raisedShare, lng), height: fmtNumber(zones.site.structures.maxHeightM, lng, 1) })}
+                />
+              )}
               {zones.site.elevation && (
                 <Row
                   label={t("plot.elevation")}
@@ -383,6 +389,7 @@ export default function Home() {
         measureReset={measureReset}
         onMeasure={setMeasured}
         onMove={(v) => (view.current = v)}
+        loadContours={(bbox, signal) => api.contours(config.code, bbox, signal)}
         onTap={(p) => {
           setCandidates(false);
           void onTap(p);

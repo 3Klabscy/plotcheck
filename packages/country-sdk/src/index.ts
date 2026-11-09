@@ -177,6 +177,8 @@ export interface CountryModule {
   defaults: CountryDefaults;
   legal: LegalTexts;
   features: Partial<Record<FeatureFlag, boolean>>;
+  /** Contour lines (GeoJSON) over a small lat/lng box, for the map. */
+  contours?(ctx: ProviderContext, bbox: [number, number, number, number]): Promise<unknown>;
   /** Streets by name (address search). */
   streetSearch?(query: string, opts?: { limit?: number }): StreetHit[];
   /** Map basemaps / overlays offered to the client (all public, CORS-enabled sources). */
@@ -185,7 +187,7 @@ export interface CountryModule {
   messages: Record<string, Record<string, string>>;
 }
 
-export type MapLayerGroup = "basemap" | "cadastre" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
 
 interface MapLayerBase {
   id: string;
@@ -210,7 +212,9 @@ interface MapLayerBase {
 export type MapLayerDef =
   | (MapLayerBase & { kind: "xyz"; url: string; role: "basemap" | "overlay" })
   | (MapLayerBase & { kind: "wms"; url: string; layers: string; role: "basemap" | "overlay" })
-  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string; role: "basemap" | "overlay" });
+  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string; role: "basemap" | "overlay" })
+  /** Drawn by the app from the API's /v1/contours (vector lines with labels). */
+  | (MapLayerBase & { kind: "contours"; role: "overlay" });
 
 /** A street found by name, to move the map there. */
 export interface StreetHit {

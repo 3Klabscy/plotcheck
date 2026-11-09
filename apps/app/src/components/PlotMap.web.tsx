@@ -27,7 +27,7 @@ function arcgisTiles(url: string, layers?: string) {
   return `${url}/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=512,512&format=png32&transparent=true&f=image${layers ? `&layers=${encodeURIComponent(layers)}` : ""}`;
 }
 
-function sourceFor(l: MapLayerDef): StyleSpecification["sources"][string] {
+function sourceFor(l: Exclude<MapLayerDef, { kind: "contours" }>): StyleSpecification["sources"][string] {
   const common = { type: "raster" as const, minzoom: l.minzoom ?? 0, ...(l.maxzoom ? { maxzoom: l.maxzoom } : {}) };
   if (l.kind === "xyz") return { ...common, tiles: [l.url], tileSize: 256 };
   if (l.kind === "wms") return { ...common, tiles: [wmsTiles(l.url, l.layers)], tileSize: 512 };
@@ -68,7 +68,10 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     const sources: StyleSpecification["sources"] = {
       streets: { type: "raster", tiles: [STREETS.url], tileSize: 256, attribution: STREETS.attribution, maxzoom: 19 },
     };
-    for (const l of props.layers) sources[l.id] = { ...sourceFor(l), attribution: props.attribution(l.attributionKey, l.date) } as StyleSpecification["sources"][string];
+    for (const l of props.layers)
+      sources[l.id] = l.kind === "contours"
+        ? { type: "geojson", data: { type: "FeatureCollection", features: [] }, attribution: props.attribution(l.attributionKey) }
+        : ({ ...sourceFor(l), attribution: props.attribution(l.attributionKey, l.date) } as StyleSpecification["sources"][string]);
     const style: StyleSpecification = {
       version: 8,
       sources,
@@ -76,7 +79,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
         { id: "blank", type: "background", paint: { "background-color": "#F4F3EE" } },
         { id: "streets", type: "raster", source: "streets", layout: { visibility: "none" } },
         // basemaps first, then overlays in catalogue order
-        ...[...props.layers.filter((l) => l.role === "basemap"), ...props.layers.filter((l) => l.role === "overlay")].map((l) => ({
+        ...[...props.layers.filter((l) => l.role === "basemap"), ...props.layers.filter((l) => l.role === "overlay" && l.kind !== "contours")].map((l) => ({
           id: l.id,
           type: "raster" as const,
           source: l.id,
@@ -84,7 +87,15 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
           paint: { "raster-opacity": l.opacity ?? 1, "raster-fade-duration": 150 },
           layout: { visibility: "none" as "none" | "visible" },
         })),
+        ...props.layers.filter((l) => l.kind === "contours").flatMap((l) => [
+          { id: l.id, type: "line" as const, source: l.id, minzoom: l.minzoom ?? 0, layout: { visibility: "none" as const },
+            paint: { "line-color": "#C65D00", "line-opacity": 0.85, "line-width": ["case", ["get", "major"], 1.6, 0.7] as unknown as number } },
+          { id: `${l.id}-labels`, type: "symbol" as const, source: l.id, minzoom: (l.minzoom ?? 0) + 1, filter: ["==", ["get", "major"], true] as never,
+            layout: { visibility: "none" as const, "symbol-placement": "line" as const, "text-field": ["concat", ["to-string", ["get", "elevation"]], " m"] as never, "text-size": 11, "text-font": ["Noto Sans Regular"] },
+            paint: { "text-color": "#7A3A00", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } },
+        ]),
       ],
+      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     };
     const m = new maplibregl.Map({
       container: el.current,
@@ -115,6 +126,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     m.on("moveend", () => {
       const c = m.getCenter();
       latest.current.onMove?.({ lng: c.lng, lat: c.lat, zoom: m.getZoom() });
+      refreshContours();
     });
     m.on("click", (e) => {
       const tool = latest.current.measure;
@@ -160,6 +172,26 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     } else marker.current?.remove();
   }
 
+  const contourAbort = useRef<AbortController | null>(null);
+  function refreshContours() {
+    const m = map.current, p = latest.current;
+    const layer = p.layers.find((l) => l.kind === "contours");
+    if (!m || !loaded.current || !layer || !p.loadContours) return;
+    const on = p.overlays.includes(layer.id) && m.getZoom() >= (layer.minzoom ?? 0);
+    m.setLayoutProperty(`${layer.id}-labels`, "visibility", on ? "visible" : "none");
+    if (!on) return;
+    const b = m.getBounds();
+    // the API serves at most ~1 km: take the middle of the view when zoomed out further
+    const cx = (b.getWest() + b.getEast()) / 2, cy = (b.getSouth() + b.getNorth()) / 2;
+    const hw = Math.min((b.getEast() - b.getWest()) / 2, 0.0055), hh = Math.min((b.getNorth() - b.getSouth()) / 2, 0.0045);
+    contourAbort.current?.abort();
+    const ac = new AbortController();
+    contourAbort.current = ac;
+    p.loadContours([cx - hw, cy - hh, cx + hw, cy + hh], ac.signal)
+      .then((fc) => { if (!ac.signal.aborted) (m.getSource(layer.id) as GeoJSONSource | undefined)?.setData(fc); })
+      .catch(() => undefined);
+  }
+
   function drawMeasure() {
     const m = map.current;
     if (!m || !loaded.current) return;
@@ -171,6 +203,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
   }
 
   useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure]);
+  useEffect(refreshContours, [props.overlays]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     measurePts.current = [];
     drawMeasure();

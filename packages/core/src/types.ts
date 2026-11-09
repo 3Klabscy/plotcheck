@@ -247,6 +247,19 @@ export interface SiteContext {
   provenance: Provenance;
   /** Ground elevation across the plot, metres above mean sea level. */
   elevation?: SiteElevation;
+  /** What stands on the plot today, from the surface model minus the terrain model. */
+  structures?: SiteStructures;
+}
+
+export interface SiteStructures {
+  /** Area of the plot covered by something ≥ 2.5 m above the ground (buildings or trees). */
+  raisedM2: number;
+  /** Share of the plot area. */
+  raisedShare: number;
+  /** Height of the tallest part (98th percentile, to ignore poles and wires), metres. */
+  maxHeightM: number;
+  source: string;
+  provenance: Provenance;
 }
 
 export interface SiteElevation {

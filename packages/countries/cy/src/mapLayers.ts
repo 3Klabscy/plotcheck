@@ -29,6 +29,12 @@ export const cyMapLayers: MapLayerDef[] = [
   { id: "cy-quarters", kind: "arcgis", role: "overlay", group: "cadastre", titleKey: "cy.layer.quarters",
     url: svc("CP_CadastralParcels"), layers: "show:2", attributionKey: "cy.attribution.dls", minzoom: 12, opacity: 0.9 },
 
+  // ---- terrain ----
+  { id: "cy-contours", kind: "contours", role: "overlay", group: "terrain", titleKey: "cy.layer.contours", date: "2019",
+    attributionKey: "cy.attribution.dtm", minzoom: 16 },
+  { id: "cy-hillshade", kind: "arcgis", role: "overlay", group: "terrain", titleKey: "cy.layer.hillshade", date: "1993",
+    url: `${BASEMAPS}/Imagery_HillShade_1993/MapServer`, attributionKey: "cy.attribution.dls", opacity: 0.45 },
+
   // ---- planning ----
   { id: "cy-planning-zones", kind: "wms", role: "overlay", group: "planning", titleKey: "cy.layer.zones",
     url: `${svc("LU_LandUse")}/exts/InspireView/service`, layers: PLANNING_ZONE_LAYER, attributionKey: "cy.attribution.dls", minzoom: 13, opacity: 0.35 },

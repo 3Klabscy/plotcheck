@@ -69,4 +69,9 @@ describe("plot search", () => {
     expect(layers.filter((l) => l.role === "basemap").map((l) => l.id)).toEqual(["cy-ortho-2019", "cy-ortho-2014", "cy-ortho-1993", "cy-ortho-1963"]);
     expect(layers.every((l) => l.titleKey && l.group)).toBe(true);
   });
+  it("validates the contour box", async () => {
+    const get = (q: string) => api(new Request(`http://x/v1/contours?country=CY&bbox=${q}`));
+    expect((await get("1,2,3")).status).toBe(400);
+    expect((await get("33.6,34.9,33.7,35.0")).status).toBe(400);
+  });
 });

@@ -22,6 +22,8 @@ export interface PlotMapProps {
   onTap(p: { lng: number; lat: number }): void;
   onSelectNeighbour?(id: string): void;
   onMove?(v: { lng: number; lat: number; zoom: number }): void;
+  /** Contour lines for a view box (layer kind "contours"). */
+  loadContours?(bbox: [number, number, number, number], signal: AbortSignal): Promise<GeoJSON.FeatureCollection>;
   /** Credit line for a layer's attribution key (already translated). */
   attribution(key: string, date?: string): string;
 }

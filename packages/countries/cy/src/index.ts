@@ -9,6 +9,7 @@ import { cyFinanceDefaults } from "./finance.ts";
 import { cyRestrictionLayers, larnacaNoiseFor } from "./restrictions.ts";
 import { larnacaStreetSearch } from "./larnaca/roads.ts";
 import { cyMapLayers } from "./mapLayers.ts";
+import { cyContours } from "./dls/contours.ts";
 import el from "./i18n/el.ts";
 import en from "./i18n/en.ts";
 
@@ -32,6 +33,7 @@ export const cyprus: CountryModule = {
   siteContext: cySiteContextWithElevation,
   financeDefaults: cyFinanceDefaults,
   streetSearch: larnacaStreetSearch,
+  contours: cyContours,
   coverage: [{ dist_abbr: "Κα4", planName: "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ", status: "curated" }],
   defaults: {
     storeyHeightM: 3.2,
@@ -52,7 +54,9 @@ export * from "./plotId.ts";
 export * from "./rules.ts";
 export * from "./relaxations.ts";
 export { cySiteContext, cySiteContextWithElevation, cyPlotElevation } from "./site.ts";
-export { groundElevation, readPixel, lzwDecode, dtmTilesAt } from "./dls/elevation.ts";
+export { groundElevation, readPixel, readWindow, terrainGrid, lzwDecode, dtmTilesAt } from "./dls/elevation.ts";
+export { cyContours, contourLines, chooseInterval } from "./dls/contours.ts";
+export { cyPlotStructures } from "./site.ts";
 export * from "./restrictions.ts";
 export { cyFinanceDefaults, officialLandValue } from "./finance.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";

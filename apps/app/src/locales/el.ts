@@ -302,5 +302,9 @@ const el: Record<string, string> = {
   "map.orthoCredit": "Ορθοφωτοχάρτης {{date}} © ΤΚΧ Κύπρου",
   "plot.elevation": "Υψόμετρο εδάφους",
   "plot.elevationSource": "ΤΚΧ {{source}}",
+  "plot.structures": "Υφιστάμενα στο τεμάχιο",
+  "plot.structuresNone": "ακάλυπτο (τίποτα πάνω από 2,5 μ.)",
+  "plot.structuresValue": "κτίσματα/δέντρα σε {{area}} ({{share}}), ύψος έως ~{{height}} μ.",
+  "map.group.terrain": "Ανάγλυφο",
 };
 export default el;

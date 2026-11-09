@@ -302,5 +302,9 @@ const en: Record<string, string> = {
   "map.orthoCredit": "Orthophoto {{date}} © DLS Cyprus",
   "plot.elevation": "Ground elevation",
   "plot.elevationSource": "DLS {{source}}",
+  "plot.structures": "Standing on the plot now",
+  "plot.structuresNone": "open ground (nothing over 2.5 m)",
+  "plot.structuresValue": "buildings/trees on {{area}} ({{share}}), up to ~{{height}} m",
+  "map.group.terrain": "Terrain",
 };
 export default en;

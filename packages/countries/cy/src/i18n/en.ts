@@ -125,6 +125,9 @@ const messages: Record<string, string> = {
   "cy.layer.sewer": "Sewer network",
   "cy.layer.public": "Public buildings (schools, hospitals, police…)",
   "cy.layer.admin": "Administrative boundaries",
+  "cy.layer.contours": "Contour lines",
+  "cy.layer.hillshade": "Hillshade",
+  "cy.attribution.dtm": "Digital Terrain Model © DLS Cyprus, CC BY-SA 4.0",
 };
 
 export default messages;

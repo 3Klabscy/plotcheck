@@ -4,12 +4,13 @@ import type { AnalysisParams, AnalysisResult, FinanceParams } from "@plotcheck/e
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
 
-export type MapLayerGroup = "basemap" | "cadastre" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
 interface MapLayerBase { id: string; titleKey: string; group: MapLayerGroup; attributionKey: string; minzoom?: number; maxzoom?: number; opacity?: number; defaultOn?: boolean; date?: string; role: "basemap" | "overlay" }
 export type MapLayerDef =
   | (MapLayerBase & { kind: "xyz"; url: string })
   | (MapLayerBase & { kind: "wms"; url: string; layers: string })
-  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string });
+  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string })
+  | (MapLayerBase & { kind: "contours" });
 
 export interface StreetHit {
   name: string;
@@ -130,6 +131,8 @@ export const api = {
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),
   parcelsSearch: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/search", { body: { country, identifiers }, signal }),
+  contours: (country: string, bbox: [number, number, number, number], signal?: AbortSignal) =>
+    call<GeoJSON.FeatureCollection & { interval?: number }>(`/v1/contours?country=${encodeURIComponent(country)}&bbox=${bbox.map((x) => x.toFixed(5)).join(",")}`, { signal }),
   streets: (country: string, q: string, signal?: AbortSignal) =>
     call<{ country: string; streets: StreetHit[] }>(`/v1/streets?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q)}`, { signal }),
   zones: (country: string, nationalRef: string, signal?: AbortSignal) =>

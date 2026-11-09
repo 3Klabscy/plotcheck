@@ -7,7 +7,7 @@ Source: DLS INSPIRE Elevation (EL1) download feed
   - tiles: /inspire_downloads/EL/rasters/<year>_DTM/ETRS89_XXXX_YYYY.tif (GeoTIFF, float32, 1 m)
 Licence (dataset metadata): CC BY-SA 4.0, no access constraints.
 
-Output rows: [pin, west, south, east, north, flags] with flags bit 1 = 2019 DTM, bit 2 = 2014 DTM.
+Output rows: [pin, west, south, east, north, flags] with flags bit 1 = 2019 DTM, bit 2 = 2014 DTM, bit 4 = 2019 DSM.
 Usage: python3 tools/build_cy_dtm_index.py
 """
 import io, json, re, struct, urllib.request, zipfile, datetime, os
@@ -51,15 +51,15 @@ def listing(year: str) -> set:
 
 
 def main():
-    have = {"2019_DTM": listing("2019_DTM"), "2014_DTM": listing("2014_DTM")}
+    have = {"2019_DTM": listing("2019_DTM"), "2014_DTM": listing("2014_DTM"), "2019_DSM": listing("2019_DSM")}
     rows = []
     for pin, (w, s, e, n) in read_index():
         key = pin.replace("-", "_")
-        flags = (1 if key in have["2019_DTM"] else 0) | (2 if key in have["2014_DTM"] else 0)
+        flags = (1 if key in have["2019_DTM"] else 0) | (2 if key in have["2014_DTM"] else 0) | (4 if key in have["2019_DSM"] else 0)
         if flags:
             rows.append([pin, round(w, 5), round(s, 5), round(e, 5), round(n, 5), flags])
     data = {
-        "source": "DLS INSPIRE Elevation (EL1): DTM 2019/2014 1 m tiles, CC BY-SA 4.0",
+        "source": "DLS INSPIRE Elevation (EL1): DTM 2019/2014 and DSM 2019, 1 m tiles, CC BY-SA 4.0",
         "extracted": datetime.date.today().isoformat(),
         "base": f"{BASE}/rasters",
         "tiles": rows,

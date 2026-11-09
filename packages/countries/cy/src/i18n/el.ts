@@ -125,6 +125,9 @@ const messages: Record<string, string> = {
   "cy.layer.sewer": "Αποχετευτικό δίκτυο",
   "cy.layer.public": "Δημόσια κτίρια (σχολεία, νοσοκομεία, αστυνομία…)",
   "cy.layer.admin": "Διοικητικά όρια",
+  "cy.layer.contours": "Ισοϋψείς",
+  "cy.layer.hillshade": "Σκίαση ανάγλυφου",
+  "cy.attribution.dtm": "Ψηφιακό Μοντέλο Εδάφους © ΤΚΧ, CC BY-SA 4.0",
 };
 
 export default messages;

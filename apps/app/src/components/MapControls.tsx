@@ -19,7 +19,7 @@ const chip = (on: boolean) => ({
 });
 const chipText = (on: boolean) => ({ color: on ? "#fff" : colors.ink, fontSize: 12, fontWeight: "600" as const });
 
-const GROUPS: MapLayerGroup[] = ["cadastre", "planning", "risk", "environment", "infrastructure", "admin"];
+const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "environment", "infrastructure", "admin"];
 
 export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose }: { layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
   const { t } = useTranslation();

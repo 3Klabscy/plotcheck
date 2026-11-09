@@ -33,8 +33,8 @@ interface TiffInfo {
   predictor: number;
   tileW: number;
   tileH: number;
-  offsets: { pos: number; type: number; count: number; inline?: number[] };
-  counts: { pos: number; type: number; count: number; inline?: number[] };
+  offsets: number[];
+  counts: number[];
   x0: number;
   y0: number;
   sx: number;
@@ -99,11 +99,14 @@ async function parseHeader(ctx: ProviderContext, url: string): Promise<TiffInfo>
   const dbl = (t: number, i: number) => x.getFloat64(tags.get(t)!.value - lo + i * 8, le);
   const nd = tags.get(42113);
   const nodataText = nd ? new TextDecoder().decode(new Uint8Array(x.buffer, x.byteOffset + nd.value - lo, nd.count)).replace(/\0/g, "").trim() : undefined;
-  const arr = (t: number) => {
+  const arr = async (t: number): Promise<number[]> => {
     const tag = tags.get(t)!;
-    const size = TYPE_SIZE[tag.type] ?? 4;
-    return { pos: tag.count * size <= 4 ? tag.at : tag.value, type: tag.type, count: tag.count };
+    const size = tag.type === 3 ? 2 : 4;
+    if (tag.count * size <= 4) return tag.type === 3 ? [tag.value] : [tag.value];
+    const v = await range(ctx, url, tag.value, tag.value + tag.count * size - 1);
+    return Array.from({ length: tag.count }, (_, i) => (size === 2 ? v.getUint16(i * 2, le) : v.getUint32(i * 4, le)));
   };
+  const [offsets, counts] = await Promise.all([arr(324), arr(325)]);
   if (!tags.has(322)) throw new Error("DTM: TIFF is not tiled");
   return {
     le,
@@ -115,8 +118,8 @@ async function parseHeader(ctx: ProviderContext, url: string): Promise<TiffInfo>
     predictor: num(317, 1),
     tileW: num(322),
     tileH: num(323),
-    offsets: arr(324),
-    counts: arr(325),
+    offsets,
+    counts,
     sx: dbl(33550, 0),
     sy: dbl(33550, 1),
     x0: dbl(33922, 3),
@@ -181,22 +184,12 @@ export function lzwDecode(input: Uint8Array, expected: number): Uint8Array {
 
 const blocks = new Map<string, Promise<DataView | null>>();
 
-async function readEntry(ctx: ProviderContext, url: string, info: TiffInfo, a: TiffInfo["offsets"], i: number): Promise<number> {
-  const size = a.type === 3 ? 2 : 4;
-  if (a.count * size <= 4) {
-    const v = await range(ctx, url, a.pos, a.pos + 3);
-    return a.type === 3 ? v.getUint16(i * 2, info.le) : v.getUint32(0, info.le);
-  }
-  const v = await range(ctx, url, a.pos + i * size, a.pos + i * size + size - 1);
-  return a.type === 3 ? v.getUint16(0, info.le) : v.getUint32(0, info.le);
-}
-
 function readBlock(ctx: ProviderContext, url: string, info: TiffInfo, index: number): Promise<DataView | null> {
   const key = `${url}#${index}`;
   let p = blocks.get(key);
   if (!p) {
     p = (async () => {
-      const [off, len] = await Promise.all([readEntry(ctx, url, info, info.offsets, index), readEntry(ctx, url, info, info.counts, index)]);
+      const off = info.offsets[index], len = info.counts[index];
       if (!off || !len) return null;
       const raw = await range(ctx, url, off, off + len - 1);
       const bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
@@ -210,7 +203,7 @@ function readBlock(ctx: ProviderContext, url: string, info: TiffInfo, index: num
     })();
     blocks.set(key, p);
     p.catch(() => blocks.delete(key));
-    if (blocks.size > 300) blocks.delete(blocks.keys().next().value!);
+    if (blocks.size > 400) blocks.delete(blocks.keys().next().value!);
   }
   return p;
 }
@@ -224,7 +217,10 @@ export async function readPixel(ctx: ProviderContext, url: string, p: LngLat): P
   const across = Math.ceil(info.width / info.tileW);
   const block = await readBlock(ctx, url, info, Math.floor(row / info.tileH) * across + Math.floor(col / info.tileW));
   if (!block) return undefined;
-  const i = (row % info.tileH) * info.tileW + (col % info.tileW);
+  return sample(info, block, (row % info.tileH) * info.tileW + (col % info.tileW));
+}
+
+function sample(info: TiffInfo, block: DataView, i: number): number | undefined {
   const v =
     info.sampleFormat === 3 ? (info.bits === 64 ? block.getFloat64(i * 8, info.le) : block.getFloat32(i * 4, info.le))
     : info.bits === 16 ? (info.sampleFormat === 2 ? block.getInt16(i * 2, info.le) : block.getUint16(i * 2, info.le))
@@ -232,6 +228,80 @@ export async function readPixel(ctx: ProviderContext, url: string, p: LngLat): P
     : block.getUint8(i);
   if (!Number.isFinite(v) || v < -1e30 || (info.nodata !== undefined && v === info.nodata)) return undefined;
   return v;
+}
+
+export interface Grid {
+  /** NaN = no data. Row 0 is the north edge. */
+  values: Float32Array;
+  cols: number;
+  rows: number;
+  /** Lng/lat of the centre of cell (0,0) and the cell size in degrees. */
+  x0: number;
+  y0: number;
+  dx: number;
+  dy: number;
+}
+
+/**
+ * Values over a lat/lng box at `step` × native resolution (block-averaged), cells outside the
+ * raster or without data are NaN. Reads every 128×128 block it needs, in parallel.
+ */
+export async function readWindow(ctx: ProviderContext, url: string, box: [number, number, number, number], step = 1, into?: Grid): Promise<Grid> {
+  const info = await readHeader(ctx, url);
+  const c0 = Math.max(0, Math.floor((box[0] - info.x0) / info.sx)), c1 = Math.min(info.width - 1, Math.floor((box[2] - info.x0) / info.sx));
+  const r0 = Math.max(0, Math.floor((info.y0 - box[3]) / info.sy)), r1 = Math.min(info.height - 1, Math.floor((info.y0 - box[1]) / info.sy));
+  const grid = into ?? {
+    cols: Math.max(1, Math.ceil(((box[2] - box[0]) / info.sx) / step)),
+    rows: Math.max(1, Math.ceil(((box[3] - box[1]) / info.sy) / step)),
+    x0: box[0] + (info.sx * step) / 2,
+    y0: box[3] - (info.sy * step) / 2,
+    dx: info.sx * step,
+    dy: info.sy * step,
+    values: new Float32Array(0),
+  };
+  if (!into) grid.values = new Float32Array(grid.cols * grid.rows).fill(NaN);
+  if (c1 < c0 || r1 < r0) return grid;
+  const across = Math.ceil(info.width / info.tileW);
+  const want: number[] = [];
+  for (let br = Math.floor(r0 / info.tileH); br <= Math.floor(r1 / info.tileH); br++)
+    for (let bc = Math.floor(c0 / info.tileW); bc <= Math.floor(c1 / info.tileW); bc++) want.push(br * across + bc);
+  const got = new Map(await Promise.all(want.map(async (i) => [i, await readBlock(ctx, url, info, i).catch(() => null)] as const)));
+  const sum = new Float64Array(grid.values.length), n = new Uint16Array(grid.values.length);
+  for (let r = r0; r <= r1; r++) {
+    const lat = info.y0 - (r + 0.5) * info.sy;
+    const gr = Math.floor((grid.y0 + grid.dy / 2 - lat) / grid.dy);
+    if (gr < 0 || gr >= grid.rows) continue;
+    for (let c = c0; c <= c1; c++) {
+      const lng = info.x0 + (c + 0.5) * info.sx;
+      const gc = Math.floor((lng - (grid.x0 - grid.dx / 2)) / grid.dx);
+      if (gc < 0 || gc >= grid.cols) continue;
+      const block = got.get(Math.floor(r / info.tileH) * across + Math.floor(c / info.tileW));
+      if (!block) continue;
+      const v = sample(info, block, (r % info.tileH) * info.tileW + (c % info.tileW));
+      if (v === undefined) continue;
+      sum[gr * grid.cols + gc]! += v;
+      n[gr * grid.cols + gc]!++;
+    }
+  }
+  for (let k = 0; k < sum.length; k++) if (n[k]) grid.values[k] = sum[k]! / n[k]!;
+  return grid;
+}
+
+/** Tiles of one product ("2019_DTM", "2019_DSM", "2014_DTM") that overlap a box. */
+function tileUrls(box: [number, number, number, number], bit: number, product: string): string[] {
+  return INDEX.tiles
+    .filter(([, w, s, e, n, f]) => f & bit && w <= box[2] && e >= box[0] && s <= box[3] && n >= box[1])
+    .map(([pin]) => `${INDEX.base}/${product}/ETRS89_${pin.replace("-", "_")}.tif`);
+}
+
+/** A DTM (or DSM) grid over a box, merged from all the tiles it touches. */
+export async function terrainGrid(ctx: ProviderContext, box: [number, number, number, number], step: number, surface = false, like?: Grid): Promise<Grid | undefined> {
+  const urls = surface ? tileUrls(box, 4, "2019_DSM") : tileUrls(box, 1, "2019_DTM");
+  if (urls.length === 0) return undefined;
+  // `like`: resample onto the same cells as another grid (e.g. DSM onto the DTM's cells)
+  let grid: Grid | undefined = like ? { ...like, values: new Float32Array(like.values.length).fill(NaN) } : undefined;
+  for (const u of urls) grid = await readWindow(ctx, u, box, step, grid).catch(() => grid);
+  return grid;
 }
 
 // ---------- elevation lookup ----------
