@@ -3,6 +3,7 @@ const messages: Record<string, string> = {
   "cy.name": "Κύπρος",
   "cy.field.district": "Επαρχία",
   "cy.field.municipality": "Δήμος / Κοινότητα",
+  "cy.field.quarter": "Ενορία",
   "cy.field.sheetPlan": "Φύλλο / Σχέδιο",
   "cy.field.block": "Τμήμα",
   "cy.field.plot": "Αρ. Τεμαχίου",

@@ -40,3 +40,19 @@ describe("api (fixtures)", () => {
     expect((await h()).status).toBe(429);
   });
 });
+
+describe("plot search", () => {
+  it("serves the Larnaca index and rejects uncovered regions", async () => {
+    const idx = await (await api(new Request("http://x/v1/plot-index?country=CY&region=4"))).json();
+    expect(idx.municipalities.length).toBeGreaterThan(50);
+    const lar = idx.municipalities.find((m: { code: string }) => m.code === "4000");
+    expect(lar.el).toBe("Λάρνακα");
+    expect(lar.sheets["40/56W1"]["3-1"]).toBeGreaterThan(0); // plot 666's sheet/quarter/block
+    expect((await api(new Request("http://x/v1/plot-index?country=CY&region=9"))).status).toBe(404);
+  });
+  it("finds a plot from its details", async () => {
+    const r = await (await post("/v1/parcels/by-id", { country: "CY", identifiers: { municipalityCode: "4000", sheetPlan: "40/56W1", quarter: "3", block: "1", plot: "666" } })).json();
+    expect(r.parcels[0].nationalRef).toBe("4000-40/56W1-3-1-666");
+    expect((await post("/v1/parcels/by-id", { country: "CY", identifiers: { municipalityCode: "4000" } })).status).toBe(400);
+  });
+});

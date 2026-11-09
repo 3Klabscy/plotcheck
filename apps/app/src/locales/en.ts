@@ -194,5 +194,16 @@ const en: Record<string, string> = {
   "surface.transitional": "transitional",
   "restrict.title": "Restrictions",
   "restrict.none": "No restrictions found in the layers checked.",
+  "mode.map": "Tap the map",
+  "mode.details": "Enter plot details",
+  "search.choose": "Choose…",
+  "search.filter": "Type to filter",
+  "search.button": "Find plot",
+  "search.plotHint": "e.g. 666",
+  "search.plots_one": "{{count}} plot",
+  "search.plots_other": "{{count}} plots",
+  "search.source": "Official DLS plot references — {{count}} municipalities/communities of the Larnaca district.",
+  "error.region_not_covered": "Plot search is not available for this area yet.",
+  "error.invalid_identifiers": "Please complete all the plot details.",
 };
 export default en;

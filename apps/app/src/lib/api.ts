@@ -28,6 +28,18 @@ export interface ParcelsResponse {
   parcels: Parcel[];
 }
 
+export interface PlotSearchIndex {
+  region: string;
+  source: string;
+  municipalities: {
+    code: string;
+    el?: string | null;
+    en?: string | null;
+    quarters: { code: string; el?: string | null; en?: string | null }[];
+    sheets: Record<string, Record<string, number>>;
+  }[];
+}
+
 export interface RestrictionHit {
   layerId: string;
   kind: string;
@@ -93,6 +105,9 @@ export const api = {
   countries: () => call<{ countries: CountryConfig[] }>("/v1/countries"),
   parcelsAtPoint: (lng: number, lat: number, signal?: AbortSignal) =>
     call<ParcelsResponse>("/v1/parcels/at-point", { body: { lng, lat }, signal }),
+  plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
+  parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
+    call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),
   zones: (country: string, nationalRef: string, signal?: AbortSignal) =>
     call<ZonesResponse>("/v1/zones", { body: { country, nationalRef }, signal }),
   analyse: (country: string, nationalRef: string, use: UseType | "all", params?: Partial<AnalysisParams>, signal?: AbortSignal) =>

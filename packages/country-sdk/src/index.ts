@@ -88,8 +88,25 @@ export interface PlotIdField {
 
 export interface PlotIdSchema {
   fields: PlotIdField[];
+  /** Options for the cascading search form (per district/region), served to the client as JSON. */
+  searchIndex?(region: string): Promise<PlotSearchIndex | undefined>;
+  formatNationalRef?(id: PlotIdentifier): string | null;
   /** Turn a provider's national reference into the form fields (and back). */
   parseNationalRef?(ref: string): PlotIdentifier | null;
+}
+
+/** Generic cascading-search index: each level lists options; leaves carry plot counts. */
+export interface PlotSearchIndex {
+  region: string;
+  source: string;
+  municipalities: {
+    code: string;
+    el?: string | null;
+    en?: string | null;
+    quarters: { code: string; el?: string | null; en?: string | null }[];
+    /** sheet/plan → "quarter-block" → number of plots */
+    sheets: Record<string, Record<string, number>>;
+  }[];
 }
 
 export interface DocScanSchema {

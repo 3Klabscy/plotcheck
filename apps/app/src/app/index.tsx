@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
+import { PlotSearch } from "../components/PlotSearch";
 import type { PlotMapHandle } from "../components/PlotMap.types";
 import { ResultView, UseOptions, reasonText } from "../components/Result";
 import { Button, Card, Loading, Notice, Row, SectionTitle, styles } from "../components/ui";
@@ -34,6 +35,7 @@ export default function Home() {
   const [use, setUse] = useState<UseType>();
   const [basemap, setBasemap] = useState<"aerial" | "streets">("aerial");
   const [showZones, setShowZones] = useState(false);
+  const [mode, setMode] = useState<"map" | "details">("map");
   // Deep link: /?lng=33.615&lat=34.93&z=18 opens the map there (shareable view).
   const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string }>();
   const linkView = useMemo(() => {
@@ -169,9 +171,31 @@ export default function Home() {
 
       {step === "tap" && !busy && (
         <Card>
-          <Text style={styles.h2}>{t("step.tap")}</Text>
-          <Text style={[styles.muted, { marginBottom: 6 }]}>{t("step.tapHint")}</Text>
-          <Button title={t("btn.locate")} onPress={locate} kind="secondary" testID="locate" />
+          <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
+            {(["map", "details"] as const).map((m) => (
+              <Pressable key={m} testID={`mode-${m}`} onPress={() => setMode(m)}
+                style={{ flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: mode === m ? colors.accent : colors.line, backgroundColor: mode === m ? colors.allowedBg : colors.panel }}>
+                <Text style={{ fontWeight: "700", color: mode === m ? colors.accent : colors.muted, fontSize: 13 }}>{t(m === "map" ? "mode.map" : "mode.details")}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {mode === "map" ? (
+            <>
+              <Text style={styles.h2}>{t("step.tap")}</Text>
+              <Text style={[styles.muted, { marginBottom: 6 }]}>{t("step.tapHint")}</Text>
+              <Button title={t("btn.locate")} onPress={locate} kind="secondary" testID="locate" />
+            </>
+          ) : (
+            <PlotSearch
+              country={config.code}
+              region="4"
+              onFound={(p) => {
+                setTapped(undefined);
+                setParcels([p]);
+                void selectParcel(p);
+              }}
+            />
+          )}
         </Card>
       )}
 

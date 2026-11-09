@@ -3,6 +3,7 @@ const messages: Record<string, string> = {
   "cy.name": "Cyprus",
   "cy.field.district": "District",
   "cy.field.municipality": "Municipality / Community",
+  "cy.field.quarter": "Quarter",
   "cy.field.sheetPlan": "Sheet / Plan",
   "cy.field.block": "Block",
   "cy.field.plot": "Plot No.",

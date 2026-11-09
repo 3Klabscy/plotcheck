@@ -194,5 +194,16 @@ const el: Record<string, string> = {
   "surface.transitional": "μεταβατική",
   "restrict.title": "Περιορισμοί",
   "restrict.none": "Δεν βρέθηκαν περιορισμοί στα επίπεδα που ελέγχθηκαν.",
+  "mode.map": "Πάτημα στον χάρτη",
+  "mode.details": "Στοιχεία τεμαχίου",
+  "search.choose": "Επιλέξτε…",
+  "search.filter": "Πληκτρολογήστε για φιλτράρισμα",
+  "search.button": "Εύρεση τεμαχίου",
+  "search.plotHint": "π.χ. 666",
+  "search.plots_one": "{{count}} τεμάχιο",
+  "search.plots_other": "{{count}} τεμάχια",
+  "search.source": "Επίσημες αναφορές ΤΚΧ — {{count}} δήμοι/κοινότητες της επαρχίας Λάρνακας.",
+  "error.region_not_covered": "Η αναζήτηση τεμαχίου δεν είναι ακόμη διαθέσιμη για αυτή την περιοχή.",
+  "error.invalid_identifiers": "Συμπληρώστε όλα τα στοιχεία του τεμαχίου.",
 };
 export default el;

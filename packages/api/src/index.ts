@@ -189,6 +189,15 @@ export function createApi(deps: ApiDeps) {
       };
     }
 
+    if (req.method === "GET" && path === "/v1/plot-index") {
+      const c = getCountry(url.searchParams.get("country") ?? "");
+      const region = url.searchParams.get("region") ?? "";
+      if (!/^[0-9A-Za-z-]{1,10}$/.test(region)) throw new HttpError(400, "invalid_region");
+      const idx = await c.plotIdSchema.searchIndex?.(region);
+      if (!idx) throw new HttpError(404, "region_not_covered");
+      return idx;
+    }
+
     if (req.method !== "POST") throw new HttpError(405, "method_not_allowed");
     const b = body<Record<string, unknown>>(await req.json().catch(() => null));
 
@@ -204,6 +213,17 @@ export function createApi(deps: ApiDeps) {
     }
 
     const country = getCountry(str(b["country"], "country", 3));
+
+    if (path === "/v1/parcels/by-id") {
+      const ids = b["identifiers"];
+      if (!ids || typeof ids !== "object") throw new HttpError(400, "invalid_identifiers");
+      const clean = Object.fromEntries(Object.entries(ids as Record<string, unknown>).filter(([, v]) => typeof v === "string" && v.length <= 40).map(([k, v]) => [k, (v as string).trim()]));
+      const ref = clean["nationalRef"] ?? country.plotIdSchema.formatNationalRef?.(clean);
+      if (!ref) throw new HttpError(400, "invalid_identifiers");
+      const parcel = await parcelByRef(country, ref, req.signal);
+      return { country: country.code, parcels: [parcel] };
+    }
+
     const ref = str(b["nationalRef"], "nationalRef");
     const parcel = await parcelByRef(country, ref, req.signal);
 
