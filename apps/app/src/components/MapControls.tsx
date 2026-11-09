@@ -74,9 +74,9 @@ const rowStyle = { flexDirection: "row" as const, alignItems: "center" as const,
 const rowText = { fontSize: 13, color: colors.ink, flex: 1 };
 
 /** Download a text file (web). On native this arrives with the store builds. */
-export function download(name: string, mime: string, text: string) {
+export function download(name: string, mime: string, text: string | Uint8Array) {
   if (Platform.OS !== "web") return;
-  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const url = URL.createObjectURL(new Blob([text as BlobPart], { type: mime }));
   const a = document.createElement("a");
   a.href = url;
   a.download = name;

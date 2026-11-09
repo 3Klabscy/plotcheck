@@ -1,54 +1,15 @@
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
-import type { AnalysisResult, Check } from "@plotcheck/engine";
+import type { AnalysisResult } from "@plotcheck/engine";
+import { dedupeReview, headline, reasonText } from "../lib/text";
+export { headline, reasonText };
 import type { UseType } from "@plotcheck/core";
 import type { AnalyseResponse } from "../lib/api";
 import { fmtArea, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, StatusBadge, styles } from "./ui";
 import { RelaxationsView } from "./Relaxations";
-import { FinanceView } from "./Finance";
-
-/** Translate engine reason params: use keys → names, numbers → local format. */
-export function reasonText(t: TFunction, lng: string, c: Pick<Check, "reasonKey" | "params">): string {
-  const params: Record<string, string> = {};
-  for (const [k, v] of Object.entries(c.params ?? {})) {
-    if (k === "use") params[k] = t(`use.${v}`);
-    else if (k === "type") params[k] = t(`unit.${v}`);
-    else if (k === "surface") params[k] = t(`surface.${v}`);
-    else if (k === "years" || k === "code") params[k] = String(v);
-    else params[k] = typeof v === "number" ? fmtNumber(v, lng, 1) : String(v);
-  }
-  return t(c.reasonKey, params);
-}
-
-export function headline(t: TFunction, lng: string, r: AnalysisResult): string {
-  const f = r.figures;
-  if (r.checks.some((c) => c.id === "use" && c.status === "not_allowed")) {
-    return t("result.headline.not_allowed", { use: t(`use.${r.use}`), zone: r.zone.code });
-  }
-  const base = { gfa: fmtArea(f.achievableGfaM2, lng), floors: f.feasibleFloors, coverage: fmtArea(f.footprintM2, lng) };
-  let s = "";
-  switch (r.use) {
-    case "apartment_block":
-      s = t("result.headline.apartment_block", { ...base, units: r.units?.total ?? 0, pmin: r.units?.parking.min ?? 0, pmax: r.units?.parking.max ?? 0 });
-      break;
-    case "house":
-      s = t("result.headline.house", base);
-      break;
-    case "row_houses":
-      s = t("result.headline.row_houses", { ...base, count: r.houses?.count ?? 0, each: fmtArea(r.houses?.gfaEachM2 ?? 0, lng) });
-      break;
-    case "commercial":
-      s = t("result.headline.commercial", { ...base, net: fmtArea(r.commercial?.netM2 ?? 0, lng), pmin: r.commercial?.parking.min ?? 0, pmax: r.commercial?.parking.max ?? 0 });
-      break;
-    case "mixed_use":
-      s = t("result.headline.mixed_use", { ...base, commercial: fmtArea(r.commercial?.gfaM2 ?? 0, lng), units: r.units?.total ?? 0 });
-      break;
-  }
-  return r.status === "maybe" ? t("result.headline.maybePrefix") + s : s;
-}
+import { FinanceView, type FinanceSnapshot } from "./Finance";
 
 export function UseOptions({ data, onPick, selected }: { data: AnalyseResponse; onPick(u: UseType): void; selected?: UseType }) {
   const { t, i18n } = useTranslation();
@@ -84,7 +45,7 @@ export function UseOptions({ data, onPick, selected }: { data: AnalyseResponse; 
   );
 }
 
-export function ResultView({ data, result }: { data: AnalyseResponse; result: AnalysisResult }) {
+export function ResultView({ data, result, onFinance }: { data: AnalyseResponse; result: AnalysisResult; onFinance?(s: FinanceSnapshot | undefined): void }) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const f = result.figures;
@@ -171,7 +132,7 @@ export function ResultView({ data, result }: { data: AnalyseResponse; result: An
         )}
       </Card>
 
-      <FinanceView data={data} result={result} />
+      <FinanceView data={data} result={result} onChange={onFinance} />
 
       <Card>
         <SectionTitle>{t("result.toBeChecked")}</SectionTitle>
@@ -193,13 +154,3 @@ export function ResultView({ data, result }: { data: AnalyseResponse; result: An
   );
 }
 
-/** Group unverified values by their source so each source is listed once. */
-function dedupeReview(r: AnalysisResult) {
-  const groups = new Map<string, Set<string>>();
-  for (const w of r.needsReview) {
-    const g = groups.get(w.provenance.source) ?? new Set<string>();
-    g.add(w.constraint);
-    groups.set(w.provenance.source, g);
-  }
-  return [...groups].map(([source, cs]) => ({ source, constraints: [...cs] }));
-}

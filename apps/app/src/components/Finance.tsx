@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Pressable, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { areasFrom, finance, type AnalysisResult, type FinanceParams } from "@plotcheck/engine";
+import { areasFrom, finance, type AnalysisResult, type FinanceAreas, type FinanceParams, type FinanceResult } from "@plotcheck/engine";
 import type { AnalyseResponse, FinanceDefaults } from "../lib/api";
 import { fmtArea, fmtMoney, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, styles } from "./ui";
 
-type Finish = "basic" | "standard" | "high";
-type Scenario = "base" | "relaxed";
+export type Finish = "basic" | "standard" | "high";
+export type Scenario = "base" | "relaxed";
 
 function Stepper({ label, value, onChange, step, min, format, testID }: { label: string; value: number; onChange(v: number): void; step: number; min: number; format(v: number): string; testID: string }) {
   const btn = (d: number, s: string) => (
@@ -54,14 +54,26 @@ function Segment<T extends string>({ options, value, onChange, label, testID }: 
   );
 }
 
-/** Financial feasibility: estimates from the country module, adjustable and recomputed on the device. */
-export function FinanceView({ data, result }: { data: AnalyseResponse; result: AnalysisResult }) {
-  const fd = data.finance;
-  if (!fd || result.status === "not_allowed" || result.figures.achievableGfaM2 <= 0) return null;
-  return <FinanceCard key={`${data.parcel.nationalRef}-${result.use}`} fd={fd} data={data} result={result} />;
+/** What the finance card shows right now (the user's own assumptions), e.g. for the PDF report. */
+export interface FinanceSnapshot {
+  use: AnalysisResult["use"];
+  scenario: Scenario;
+  finish: Finish;
+  params: FinanceParams;
+  areas: FinanceAreas;
+  result: FinanceResult;
 }
 
-function FinanceCard({ fd, data, result }: { fd: FinanceDefaults; data: AnalyseResponse; result: AnalysisResult }) {
+/** Financial feasibility: estimates from the country module, adjustable and recomputed on the device. */
+export function FinanceView({ data, result, onChange }: { data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot | undefined): void }) {
+  const fd = data.finance;
+  const show = !!fd && result.status !== "not_allowed" && result.figures.achievableGfaM2 > 0;
+  useEffect(() => { if (!show) onChange?.(undefined); }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!show) return null;
+  return <FinanceCard key={`${data.parcel.nationalRef}-${result.use}`} fd={fd} data={data} result={result} onChange={onChange} />;
+}
+
+function FinanceCard({ fd, data, result, onChange }: { fd: FinanceDefaults; data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot): void }) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const defaults = fd.byUse[result.use];
@@ -83,6 +95,8 @@ function FinanceCard({ fd, data, result }: { fd: FinanceDefaults; data: AnalyseR
 
   const params: FinanceParams = { ...defaults, salePricePerM2: price, commercialPricePerM2: commercialPrice, constructionCostPerM2: Math.round(cost * fd.finishFactor[finish]), basementLevels: basement, targetProfitPctOfGdv: profitPct / 100, ...(landPrice ? { landPrice } : {}) };
   const r = finance(areas, params);
+  const snapKey = JSON.stringify([scenario, finish, params, areas]);
+  useEffect(() => { onChange?.({ use: result.use, scenario, finish, params, areas, result: r }); }, [snapKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (n: number) => fmtMoney(n, lng, r.currency);
   const perM2 = (n: number) => `${money(n)}/m²`;

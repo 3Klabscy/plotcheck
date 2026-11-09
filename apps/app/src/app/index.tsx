@@ -5,7 +5,8 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
-import { DrawingsPanel, LayerPanel, MapToolbar } from "../components/MapControls";
+import { DrawingsPanel, LayerPanel, MapToolbar, download } from "../components/MapControls";
+import type { FinanceSnapshot } from "../components/Finance";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -46,6 +47,8 @@ export default function Home() {
   const view = useRef<{ lng: number; lat: number; zoom: number; bbox: [number, number, number, number] } | undefined>(undefined);
   const [drawings, setDrawings] = useState<UserCollection>({ type: "FeatureCollection", features: [] });
   const [drawingsOpen, setDrawingsOpen] = useState(false);
+  const [financeSnap, setFinanceSnap] = useState<FinanceSnapshot>();
+  const [reportBusy, setReportBusy] = useState(false);
   const [mode, setMode] = useState<"map" | "details">("map");
   // Deep links: /?ref=<national ref> opens that plot; /?lng=33.615&lat=34.93&z=18 opens the map there.
   const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string }>();
@@ -225,6 +228,24 @@ export default function Home() {
       return undefined;
     } catch (e) {
       return e instanceof ApiError ? e.code : "generic";
+    }
+  };
+
+  const makeReport = async () => {
+    if (!config || !analysis || !result || !zones) return;
+    setReportBusy(true);
+    setError(null);
+    try {
+      // loaded on demand: pdf-lib and the fonts are only needed here
+      const [{ buildReport }, { loadFonts }] = await Promise.all([import("../lib/report/build"), import("../lib/report/fonts")]);
+      const pdf = await buildReport({ t, lng, config, zones, data: analysis, result, ...(financeSnap ? { finance: financeSnap } : {}), fonts: await loadFonts(), generatedAt: new Date() });
+      const name = `plotcheck-${analysis.parcel.nationalRef.replace(/[^\w-]+/g, "_")}-${result.use}.pdf`;
+      download(name, "application/pdf", pdf);
+    } catch (e) {
+      console.error(e);
+      setError("report_failed");
+    } finally {
+      setReportBusy(false);
     }
   };
 
@@ -431,7 +452,13 @@ export default function Home() {
         </>
       )}
 
-      {step === "result" && analysis && result && <ResultView data={analysis} result={result} />}
+      {step === "result" && analysis && result && (
+        <>
+          <Button title={reportBusy ? t("report.making") : t("report.download")} onPress={makeReport} disabled={reportBusy} testID="report-pdf" />
+          <View style={{ height: 12 }} />
+          <ResultView data={analysis} result={result} onFinance={setFinanceSnap} />
+        </>
+      )}
 
       {step !== "tap" && !busy && (
         <Button

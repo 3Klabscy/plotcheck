@@ -1,4 +1,4 @@
-import { localeTag } from "./i18n";
+export const localeTag = (lng: string) => (lng === "el" ? "el-CY" : "en-GB");
 
 export function fmtNumber(n: number, lng: string, digits = 0): string {
   return new Intl.NumberFormat(localeTag(lng), { maximumFractionDigits: digits, minimumFractionDigits: 0 }).format(n);

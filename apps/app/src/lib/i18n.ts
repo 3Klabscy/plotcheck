@@ -44,6 +44,6 @@ export function addCountryMessages(messages: Record<string, Record<string, strin
   for (const [lng, bundle] of Object.entries(messages)) i18n.addResourceBundle(lng, "translation", bundle, true, false);
 }
 
-export const localeTag = (lng: string) => (lng === "el" ? "el-CY" : "en-GB");
+export { localeTag } from "./format";
 
 export default i18n;

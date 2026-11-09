@@ -13,6 +13,12 @@
 - Turf.js (MIT), MapLibre GL JS (BSD-3-Clause), fast-xml-parser (MIT), i18next (MIT),
   Expo / React Native (MIT).
 
+## Fonts and libraries in the app
+
+- **Noto Sans** (Regular, Bold), `apps/app/assets/fonts/`: © The Noto Project Authors, SIL Open
+  Font License 1.1 (`apps/app/assets/fonts/OFL.txt`). Embedded (subset) in the PDF reports.
+- **pdf-lib** and **@pdf-lib/fontkit**: MIT licence. PDF report generation on the device.
+
 ## Data
 
 - Cadastral parcels, planning zones, orthophotos: **Department of Lands and Surveys,

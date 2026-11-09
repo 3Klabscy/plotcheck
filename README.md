@@ -36,6 +36,10 @@ be built on it. Web only in phase 1, built on the multi-country architecture fro
   finish level, basements and profit target are editable and recompute on the device. The DLS
   General Valuation (1/1/2021) value for the plot's area and zone is shown for comparison. All
   figures are estimates, ex-VAT, with sources listed.
+- **PDF report.** One click builds an A4 report on the device (Greek or English): the plot,
+  an orthophoto map with the plot and the buildable footprint, the planning zone, restrictions,
+  what can be built, the relaxations, the finance with the user's own assumptions, the engineer's
+  checklist, unverified values and the disclaimer. Example: `docs/sample-report-666-el.pdf`.
 - **Trust.** Every unverified value is listed under a warning, together with its source. Every
   result shows the "to be checked by an engineer" list and the disclaimer.
 - **Greek and English** throughout, with local number formats.
@@ -98,7 +102,8 @@ issued (phase 2). Point the app at the function with
 - Permitted uses come from the zone-code letter (a heuristic, flagged for review).
 - A single uniform boundary setback is used. Front setbacks and street alignment are flagged
   for an engineer to check.
-- Not built yet: document scan, PDF export, paywall. Finance defaults are listing-based
+- Not built yet: document scan, accounts, paywall. The PDF download works on the web; on
+  iOS/Android it arrives with the store builds (share sheet). Finance defaults are listing-based
   estimates for Larnaca; they are not a valuation.
 - OSM street tiles are for the prototype only. "PlotCheck" is a placeholder brand.
 - Greek copy needs review by a native speaker.

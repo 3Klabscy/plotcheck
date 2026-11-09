@@ -2,6 +2,7 @@ import { Linking, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { AnalysisResult, AppliedRelaxation } from "@plotcheck/engine";
 import { fmtArea, fmtNumber } from "../lib/format";
+import { contributionText, relaxedHeadline } from "../lib/text";
 import { colors } from "../theme";
 import { Card, SectionTitle, styles } from "./ui";
 
@@ -13,18 +14,6 @@ function TierBadge({ tier }: { tier: AppliedRelaxation["tier"] }) {
       <Text style={{ color: fg, fontSize: 11, fontWeight: "700" }}>{t(`tier.${tier}`)}</Text>
     </View>
   );
-}
-
-function contributionText(t: ReturnType<typeof useTranslation>["t"], lng: string, a: AppliedRelaxation): string[] {
-  const c = a.contribution;
-  const out: string[] = [];
-  if (c.farAdd) out.push(t("contrib.far", { far: fmtNumber(c.farAdd, lng, 2), gfa: fmtArea(c.gfaM2 ?? 0, lng) }));
-  if (c.floorsAdd) out.push(t("contrib.floors", { floors: c.floorsAdd, height: fmtNumber(c.heightAddM ?? 0, lng, 1) }));
-  else if (c.heightAddM) out.push(t("contrib.height", { height: fmtNumber(c.heightAddM, lng, 1) }));
-  if (c.verandaM2) out.push(t("contrib.veranda", { area: fmtArea(c.verandaM2, lng) }));
-  if (c.basementPerLevelM2) out.push(t("contrib.basement", { area: fmtArea(c.basementPerLevelM2, lng) }));
-  if (c.setbackM !== undefined) out.push(t("contrib.setback", { m: fmtNumber(c.setbackM, lng, 1) }));
-  return out;
 }
 
 function Item({ a, showContribution }: { a: AppliedRelaxation; showContribution: boolean }) {
@@ -65,12 +54,7 @@ export function RelaxationsView({ result }: { result: AnalysisResult }) {
   const x = result.relaxed;
   if (!x) return null;
   const f = x.figures;
-  const headline =
-    x.gain.gfaM2 <= 0.5
-      ? t("relax.headline.none")
-      : x.units
-        ? t("relax.headline.units", { gfa: fmtArea(f.achievableGfaM2, lng), floors: f.feasibleFloors, units: x.units.total, gain: fmtArea(x.gain.gfaM2, lng), gainUnits: x.gain.units })
-        : t("relax.headline.area", { gfa: fmtArea(f.achievableGfaM2, lng), floors: f.feasibleFloors, gain: fmtArea(x.gain.gfaM2, lng) });
+  const headline = relaxedHeadline(t, lng, result)!;
   const titleOf = (id: string) => {
     const r = [...x.alternativeDetails, ...x.applied].find((a) => a.id === id);
     return r ? t(r.titleKey) : id;
