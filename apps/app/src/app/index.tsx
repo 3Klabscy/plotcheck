@@ -12,6 +12,8 @@ import { OptionsCompare } from "../components/OptionsCompare";
 import type { ComparableKind, ComparableSale } from "@plotcheck/engine";
 import { kindForUse } from "../lib/comparables";
 import type { PriceChoice } from "../lib/options";
+import { AccountButton, SavedPlotsCard, SavePlotBar, SignInCard } from "../components/Account";
+import { useAccount, type SavedPlot } from "../lib/account";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -86,6 +88,18 @@ export default function Home() {
 
   const selected = useMemo(() => parcels.find((p) => p.nationalRef === selectedRef), [parcels, selectedRef]);
   const result = analysis?.results.find((r) => r.use === use);
+
+  // ---------- account: sign-in, saved plots, auto-save of the open saved plot ----------
+  const acc = useAccount();
+  const [signIn, setSignIn] = useState<string | false>(false);
+  const savedCurrent = acc.plots.find((p) => p.national_ref === selected?.nationalRef && p.country_code === config?.code);
+  const savedId = savedCurrent?.id;
+  useEffect(() => {
+    if (!savedId) return;
+    const h = setTimeout(() => void acc.updatePlot(savedId, { comparables, drawings, ...(use ? { use_type: use } : {}) }), 1200);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparables, drawings, use, savedId]);
 
   const run = useCallback(async <T,>(label: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T | undefined> => {
     abort.current?.abort();
@@ -275,6 +289,46 @@ export default function Home() {
     return `E ${e.toFixed(2)}  N ${n.toFixed(2)}`;
   };
 
+  const savePlot = async () => {
+    if (!config || !selected) return;
+    const ring = (selected.geometry.type === "Polygon" ? selected.geometry.coordinates[0] : selected.geometry.coordinates[0]?.[0]) ?? [];
+    const pts = ring.slice(0, -1);
+    await acc.savePlot({
+      country_code: config.code,
+      national_ref: selected.nationalRef,
+      label: selected.label ? t("plot.title", { label: selected.label }) : null,
+      note: null,
+      centroid_lng: pts.length ? pts.reduce((a, p) => a + p[0]!, 0) / pts.length : null,
+      centroid_lat: pts.length ? pts.reduce((a, p) => a + p[1]!, 0) / pts.length : null,
+      area_m2: selected.officialAreaM2 ?? null,
+      zone_code: zones?.primary?.zone.zoneCode ?? null,
+      use_type: use ?? null,
+      comparables,
+      drawings,
+    });
+  };
+
+  const openSaved = async (sp: SavedPlot) => {
+    if (!config) return;
+    const r = await run(t("loading.parcel"), (signal) => api.parcelsById(config.code, { nationalRef: sp.national_ref }, signal));
+    const p = r?.parcels[0];
+    if (!p) return;
+    setTapped(undefined);
+    setCandidates(false);
+    setComparables(sp.comparables ?? []);
+    setDrawings(sp.drawings?.features ? sp.drawings : { type: "FeatureCollection", features: [] });
+    setParcels([p]);
+    await selectParcel(p);
+    if (sp.use_type) {
+      const a = await run(t("loading.analysis"), (signal) => api.analyse(config.code, p.nationalRef, "all", undefined, signal));
+      if (a) {
+        setAnalysis(a);
+        setUse(sp.use_type);
+        setStep("result");
+      }
+    }
+  };
+
   if (!config) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, padding: 24 }}>
@@ -294,7 +348,8 @@ export default function Home() {
           <Text style={styles.h1}>{t("app.name")}</Text>
           <Text style={styles.muted}>{t("app.tagline")}</Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 6 }}>
+        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+          <AccountButton onSignIn={() => setSignIn(t("acc.why"))} />
           {config.locales.map((l) => (
             <Pressable key={l} testID={`lang-${l}`} onPress={() => setLanguage(l)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: lng === l ? colors.accent : colors.line, backgroundColor: lng === l ? colors.allowedBg : colors.panel }}>
               <Text style={{ fontWeight: "700", color: lng === l ? colors.accent : colors.muted }}>{t(`lang.${l}`)}</Text>
@@ -309,7 +364,9 @@ export default function Home() {
         </Notice>
       )}
       {busy && <Loading label={busy} />}
+      {signIn !== false && !acc.session && <SignInCard reason={signIn} onDone={() => setSignIn(false)} />}
 
+      {step === "tap" && !busy && <SavedPlotsCard onOpen={(p) => void openSaved(p)} />}
       {step === "tap" && !busy && (
         <Card>
           <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
@@ -438,6 +495,15 @@ export default function Home() {
             </View>
           )}
           {step === "parcel" && zone && !busy && <Button title={t("btn.confirm")} onPress={confirm} testID="confirm" />}
+          {zone && !busy && (
+            <SavePlotBar
+              key={savedCurrent?.id ?? "new"}
+              {...(savedCurrent ? { saved: savedCurrent } : {})}
+              onSave={savePlot}
+              onNote={(note) => savedCurrent && void acc.updatePlot(savedCurrent.id, { note })}
+              onNeedSignIn={() => setSignIn(t("acc.whySave"))}
+            />
+          )}
           {neighbours.length > 0 && step === "parcel" && (
             <View style={{ marginTop: 12 }}>
               <Text style={styles.small}>{t("plot.neighbours")}</Text>

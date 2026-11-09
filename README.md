@@ -89,19 +89,65 @@ Checks:
 npm test && npm run typecheck && npm run lint
 ```
 
+## Accounts (Supabase Auth)
+
+Sign-in is by a 6-digit code sent by e-mail (no passwords). Each user keeps "My plots": the plot,
+a note, the chosen use, comparable sales and drawings; changes to a saved plot are kept
+automatically. Row Level Security lets a user read and change only their own rows
+(`supabase/migrations/20261110000000_accounts.sql`). Without the two `EXPO_PUBLIC_SUPABASE_*`
+values the app runs without accounts.
+
+Local stack (needs Docker):
+
+```bash
+npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,storage-api,postgres-meta
+```
+
+```bash
+npx supabase status -o env
+```
+
+Put `API_URL` and `ANON_KEY` into `apps/app/.env.local` as `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` (see `apps/app/.env.example`). Sign-in e-mails appear in Mailpit at
+http://127.0.0.1:54324. The Row Level Security test runs against the local stack:
+
+```bash
+SUPABASE_TEST_URL=http://127.0.0.1:54321 SUPABASE_TEST_ANON_KEY=... SUPABASE_TEST_SERVICE_KEY=... npx vitest run apps/app/test/accounts.int.test.ts
+```
+
 ## Deploy (Supabase, EU region)
 
+1. Create the project in an EU region (e.g. Frankfurt) and link it:
+
 ```bash
-supabase db push
+npx supabase link --project-ref <project-ref>
+```
+
+2. Apply the database and the auth settings (e-mail code template, redirect URLs, rate limits):
+
+```bash
+npx supabase db push
 ```
 
 ```bash
-supabase functions deploy api --no-verify-jwt
+npx supabase config push
 ```
+
+3. Deploy the API function:
+
+```bash
+npx supabase functions deploy api --no-verify-jwt
+```
+
+4. Set a custom SMTP sender for the sign-in e-mails (Authentication → SMTP Settings). Supabase's
+   built-in sender is limited to a few e-mails per hour and is not meant for production.
+5. In the app's build settings set `EXPO_PUBLIC_API_URL=https://<project>.supabase.co/functions/v1/api`,
+   `EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+   (public by design; the data is protected by Row Level Security). Never put the service-role key
+   in the app.
 
 Set `ALLOWED_ORIGINS` as a function secret. Set `DLS_API_TOKEN` once the DLS credentials are
-issued (phase 2). Point the app at the function with
-`EXPO_PUBLIC_API_URL=https://<project>.supabase.co/functions/v1/api`.
+issued.
 
 ## Known limits (phase 1)
 
@@ -109,7 +155,7 @@ issued (phase 2). Point the app at the function with
 - Permitted uses come from the zone-code letter (a heuristic, flagged for review).
 - A single uniform boundary setback is used. Front setbacks and street alignment are flagged
   for an engineer to check.
-- Not built yet: document scan, accounts, paywall. The PDF download works on the web; on
+- Not built yet: document scan, paywall. The PDF download works on the web; on
   iOS/Android it arrives with the store builds (share sheet). Finance defaults are listing-based
   estimates for Larnaca; they are not a valuation.
 - OSM street tiles are for the prototype only. "PlotCheck" is a placeholder brand.
