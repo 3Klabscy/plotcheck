@@ -2,6 +2,7 @@
 // the Larnaca map area. See data/larnaca-roads-dls.json for sources and licence notes.
 import type { Parcel } from "@plotcheck/core";
 import roadsData from "../../data/larnaca-roads-dls.json" with { type: "json" };
+import streetsData from "../../data/larnaca-streets-cypruspost.json" with { type: "json" };
 
 interface RoadsFile {
   bbox: [number, number, number, number];
@@ -137,4 +138,88 @@ export function planGroupsFromRoads(parcel: Parcel, ctx: RoadContext): ("kep" | 
         .map((f) => PLAN_STREETS[f.name!]!),
     ),
   ];
+}
+
+// ---------- Street search (address search on the map) ----------
+
+
+const foldName = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleUpperCase("el").replace(/[^Α-ΩA-Z0-9]+/g, " ").trim();
+
+interface StreetEntry { name: string; en: string[]; postcodes: number[]; bbox: [number, number, number, number]; center: [number, number]; lengthM: number; keys: string[][] }
+let streets: StreetEntry[] | undefined;
+
+/** Split each street's links into separate stretches (same name in different areas). */
+function clusters(links: number[][]): number[][][] {
+  const parent = links.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+  const ends = links.map((f) => [toXY(f[0]!, f[1]!), toXY(f[f.length - 2]!, f[f.length - 1]!)]);
+  for (let i = 0; i < links.length; i++)
+    for (let j = i + 1; j < links.length; j++)
+      if (ends[i]!.some((a) => ends[j]!.some((b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 300))) parent[find(i)] = find(j);
+  const groups = new Map<number, number[][]>();
+  links.forEach((l, i) => (groups.get(find(i)) ?? groups.set(find(i), []).get(find(i))!).push(l));
+  return [...groups.values()];
+}
+
+function buildStreets(): StreetEntry[] {
+  const en = new Map<string, Set<string>>();
+  for (const row of (streetsData as unknown as { rows: (string | number)[][] }).rows) {
+    const k = foldName(String(row[0] ?? ""));
+    if (!k || !row[1]) continue;
+    for (const key of new Set([k, k.replace(/ ΛΕΩΦΟΡΟΣ$/, "")])) (en.get(key) ?? en.set(key, new Set()).get(key)!).add(String(row[1]));
+  }
+  const byName = new Map<number, number[][]>();
+  for (const [name, flat] of DATA.links) if (name >= 0) (byName.get(name) ?? byName.set(name, []).get(name)!).push(flat);
+  return DATA.names.flatMap(([name, postcodes], i) => {
+    const english = [...(en.get(foldName(name)) ?? [])];
+    const keys = [foldName(name), ...english.map(foldName)].map((k) => k.split(" "));
+    return clusters(byName.get(i) ?? []).map((group) => {
+      const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+      let lengthM = 0;
+      const pts: [number, number][] = [];
+      for (const flat of group)
+        for (let k = 0; k + 1 < flat.length; k += 2) {
+          pts.push([flat[k]!, flat[k + 1]!]);
+          b[0] = Math.min(b[0], flat[k]!); b[1] = Math.min(b[1], flat[k + 1]!);
+          b[2] = Math.max(b[2], flat[k]!); b[3] = Math.max(b[3], flat[k + 1]!);
+          if (k >= 2) { const a = toXY(flat[k - 2]!, flat[k - 1]!), c = toXY(flat[k]!, flat[k + 1]!); lengthM += Math.hypot(a[0] - c[0], a[1] - c[1]); }
+        }
+      // a point on the road, nearest the middle of the stretch
+      const mid = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+      const center = pts.reduce((best, p) => (Math.hypot(p[0] - mid[0]!, p[1] - mid[1]!) < Math.hypot(best[0] - mid[0]!, best[1] - mid[1]!) ? p : best), pts[0]!);
+      return { name, en: english, postcodes, bbox: b, center, lengthM, keys };
+    });
+  });
+}
+
+/** Every query word must start a word of the name ("Γρ. Αυξεντίου" finds "Γρηγόρη Αυξεντίου"). */
+function matchScore(keys: string[][], q: string[]): number | undefined {
+  let best: number | undefined;
+  for (const words of keys) {
+    if (!q.every((w) => words.some((x) => x.startsWith(w)))) continue;
+    const score = words.join(" ") === q.join(" ") ? 0 : words[0]!.startsWith(q[0]!) ? 1 : 2;
+    best = best === undefined ? score : Math.min(best, score);
+  }
+  return best;
+}
+
+/** Larnaca streets by Greek or English name; one result per separate stretch of the street. */
+export function larnacaStreetSearch(query: string, opts?: { limit?: number }) {
+  const q = foldName(query).split(" ").filter(Boolean);
+  if (q.join("").length < 2) return [];
+  streets ??= buildStreets();
+  const scored = streets
+    .map((s) => ({ s, score: matchScore(s.keys, q) }))
+    .filter((x): x is { s: StreetEntry; score: number } => x.score !== undefined)
+    .sort((a, b) => a.score - b.score || a.s.name.localeCompare(b.s.name, "el") || b.s.lengthM - a.s.lengthM);
+  const parts = new Map<string, number>();
+  for (const { s } of scored) parts.set(s.name, (parts.get(s.name) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return scored.slice(0, opts?.limit ?? 12).map(({ s }) => ({
+    name: s.en[0] ? `${s.name} (${s.en[0]})` : s.name,
+    ...(parts.get(s.name)! > 1 ? { part: { n: seen.set(s.name, (seen.get(s.name) ?? 0) + 1).get(s.name)!, of: parts.get(s.name)! } } : {}),
+    postcodes: s.postcodes.map(String),
+    center: { lng: s.center[0], lat: s.center[1] },
+    bbox: s.bbox,
+  }));
 }

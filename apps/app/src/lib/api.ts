@@ -4,9 +4,20 @@ import type { AnalysisParams, AnalysisResult, FinanceParams } from "@plotcheck/e
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
 
+export type MapLayerGroup = "basemap" | "cadastre" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+interface MapLayerBase { id: string; titleKey: string; group: MapLayerGroup; attributionKey: string; minzoom?: number; maxzoom?: number; opacity?: number; defaultOn?: boolean; date?: string; role: "basemap" | "overlay" }
 export type MapLayerDef =
-  | { id: string; kind: "xyz"; url: string; attributionKey: string; maxzoom?: number; role: "basemap" }
-  | { id: string; kind: "wms"; url: string; layers: string; attributionKey: string; role: "overlay"; minzoom?: number; opacity?: number };
+  | (MapLayerBase & { kind: "xyz"; url: string })
+  | (MapLayerBase & { kind: "wms"; url: string; layers: string })
+  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string });
+
+export interface StreetHit {
+  name: string;
+  part?: { n: number; of: number };
+  postcodes: string[];
+  center: { lng: number; lat: number };
+  bbox: [number, number, number, number];
+}
 
 export interface CountryConfig {
   code: string;
@@ -117,6 +128,10 @@ export const api = {
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
   parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),
+  parcelsSearch: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
+    call<{ country: string; parcels: Parcel[] }>("/v1/parcels/search", { body: { country, identifiers }, signal }),
+  streets: (country: string, q: string, signal?: AbortSignal) =>
+    call<{ country: string; streets: StreetHit[] }>(`/v1/streets?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q)}`, { signal }),
   zones: (country: string, nationalRef: string, signal?: AbortSignal) =>
     call<ZonesResponse>("/v1/zones", { body: { country, nationalRef }, signal }),
   analyse: (country: string, nationalRef: string, use: UseType | "all", params?: Partial<AnalysisParams>, signal?: AbortSignal) =>

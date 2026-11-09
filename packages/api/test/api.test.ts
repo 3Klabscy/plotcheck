@@ -55,4 +55,18 @@ describe("plot search", () => {
     expect(r.parcels[0].nationalRef).toBe("4000-40/56W1-3-1-666");
     expect((await post("/v1/parcels/by-id", { country: "CY", identifiers: { municipalityCode: "4000" } })).status).toBe(400);
   });
+  it("searches plots by partial details (DLS 'by plot') and streets by name", async () => {
+    const r = await (await post("/v1/parcels/search", { country: "CY", identifiers: { municipalityCode: "4000", plot: "666" } })).json();
+    expect(r.parcels.length).toBeGreaterThan(0);
+    expect((await post("/v1/parcels/search", { country: "CY", identifiers: { municipalityCode: "4000' OR 1=1 --", plot: "666" } })).status).toBe(200);
+    const s = await (await api(new Request("http://x/v1/streets?country=CY&q=%CE%B5%CF%81%CE%BC%CE%BF%CF%85"))).json();
+    expect(s.streets[0].name).toMatch(/^Ερμού/);
+    expect(s.streets[0].center.lat).toBeGreaterThan(34.8);
+  });
+  it("lists map layers with names and groups", async () => {
+    const c = await (await api(new Request("http://x/v1/countries"))).json();
+    const layers = c.countries[0].mapLayers as { id: string; role: string; titleKey: string; group: string }[];
+    expect(layers.filter((l) => l.role === "basemap").map((l) => l.id)).toEqual(["cy-ortho-2019", "cy-ortho-2014", "cy-ortho-1993", "cy-ortho-1963"]);
+    expect(layers.every((l) => l.titleKey && l.group)).toBe(true);
+  });
 });

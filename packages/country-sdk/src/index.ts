@@ -29,6 +29,8 @@ export interface ParcelProvider {
   /** Parcels at/near a WGS84 point. The first result contains the point when one does. */
   getByPoint(ctx: ProviderContext, point: LngLat, opts?: { radiusM?: number }): Promise<Parcel[]>;
   getById(ctx: ProviderContext, id: PlotIdentifier): Promise<Parcel | null>;
+  /** Plots matching partial identifiers (e.g. municipality + plot number, as the cadastre's search does). */
+  search?(ctx: ProviderContext, id: PlotIdentifier, opts?: { limit?: number }): Promise<Parcel[]>;
 }
 
 export interface PlanningProvider {
@@ -175,15 +177,50 @@ export interface CountryModule {
   defaults: CountryDefaults;
   legal: LegalTexts;
   features: Partial<Record<FeatureFlag, boolean>>;
+  /** Streets by name (address search). */
+  streetSearch?(query: string, opts?: { limit?: number }): StreetHit[];
   /** Map basemaps / overlays offered to the client (all public, CORS-enabled sources). */
   mapLayers: MapLayerDef[];
   /** Country-specific UI strings per locale (field labels, attributions, legal texts). */
   messages: Record<string, Record<string, string>>;
 }
 
+export type MapLayerGroup = "basemap" | "cadastre" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+
+interface MapLayerBase {
+  id: string;
+  /** i18n key of the layer name shown in the layer panel. */
+  titleKey: string;
+  group: MapLayerGroup;
+  attributionKey: string;
+  minzoom?: number;
+  maxzoom?: number;
+  opacity?: number;
+  /** Shown when the map opens. */
+  defaultOn?: boolean;
+  /** Year or date of the data, shown next to the name (e.g. orthophoto epochs). */
+  date?: string;
+}
+
+/**
+ * Basemaps (role "basemap", one at a time) and overlays (role "overlay", any number).
+ * "arcgis" = an ArcGIS MapServer drawn through its /export endpoint (reprojects to Web Mercator,
+ * so services in a national grid work too); `layers` is the ArcGIS "show:" list.
+ */
 export type MapLayerDef =
-  | { id: string; kind: "xyz"; url: string; attributionKey: string; maxzoom?: number; role: "basemap" }
-  | { id: string; kind: "wms"; url: string; layers: string; attributionKey: string; role: "overlay"; minzoom?: number; opacity?: number };
+  | (MapLayerBase & { kind: "xyz"; url: string; role: "basemap" | "overlay" })
+  | (MapLayerBase & { kind: "wms"; url: string; layers: string; role: "basemap" | "overlay" })
+  | (MapLayerBase & { kind: "arcgis"; url: string; layers?: string; role: "basemap" | "overlay" });
+
+/** A street found by name, to move the map there. */
+export interface StreetHit {
+  name: string;
+  /** The same street name in separate places (e.g. different villages): stretch n of `of`, longest first. */
+  part?: { n: number; of: number };
+  postcodes: string[];
+  center: LngLat;
+  bbox: [number, number, number, number];
+}
 
 // ---------- Registry ----------
 

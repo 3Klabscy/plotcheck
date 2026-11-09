@@ -2,6 +2,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MLMap, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { PolygonGeometry } from "@plotcheck/core";
+import type { MapLayerDef } from "../lib/api";
+import { pathLengthM, ringAreaM2 } from "../lib/geo";
 import type { PlotMapHandle, PlotMapProps } from "./PlotMap.types";
 import { colors } from "../theme";
 
@@ -21,6 +23,25 @@ function wmsTiles(url: string, layers: string) {
   return `${url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${encodeURIComponent(layers)}&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&WIDTH=512&HEIGHT=512&BBOX={bbox-epsg-3857}`;
 }
 
+function arcgisTiles(url: string, layers?: string) {
+  return `${url}/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=512,512&format=png32&transparent=true&f=image${layers ? `&layers=${encodeURIComponent(layers)}` : ""}`;
+}
+
+function sourceFor(l: MapLayerDef): StyleSpecification["sources"][string] {
+  const common = { type: "raster" as const, minzoom: l.minzoom ?? 0, ...(l.maxzoom ? { maxzoom: l.maxzoom } : {}) };
+  if (l.kind === "xyz") return { ...common, tiles: [l.url], tileSize: 256 };
+  if (l.kind === "wms") return { ...common, tiles: [wmsTiles(l.url, l.layers)], tileSize: 512 };
+  return { ...common, tiles: [arcgisTiles(l.url, l.layers)], tileSize: 512 };
+}
+
+const measureFc = (pts: [number, number][], area: boolean) => ({
+  type: "FeatureCollection" as const,
+  features: [
+    ...(pts.length >= 2 ? [{ type: "Feature" as const, properties: {}, geometry: area && pts.length >= 3 ? { type: "Polygon" as const, coordinates: [[...pts, pts[0]!]] } : { type: "LineString" as const, coordinates: pts } }] : []),
+    ...pts.map((c) => ({ type: "Feature" as const, properties: {}, geometry: { type: "Point" as const, coordinates: c } })),
+  ],
+});
+
 function bounds(g: PolygonGeometry): [[number, number], [number, number]] {
   const pts = (g.type === "Polygon" ? g.coordinates.flat() : g.coordinates.flat(2)) as number[][];
   const xs = pts.map((p) => p[0]!), ys = pts.map((p) => p[1]!);
@@ -37,35 +58,32 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
 
   useImperativeHandle(ref, () => ({
     flyTo: (p, zoom = 18) => map.current?.flyTo({ center: [p.lng, p.lat], zoom, speed: 1.6 }),
+    fitBounds: (b) => map.current?.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom: 18, duration: 600 }),
   }));
+  const measurePts = useRef<[number, number][]>([]);
 
   // create once
   useEffect(() => {
     if (!el.current) return;
-    const basemap = props.layers.find((l) => l.role === "basemap");
     const sources: StyleSpecification["sources"] = {
       streets: { type: "raster", tiles: [STREETS.url], tileSize: 256, attribution: STREETS.attribution, maxzoom: 19 },
     };
-    if (basemap?.kind === "xyz") sources.aerial = { type: "raster", tiles: [basemap.url], tileSize: 256, maxzoom: basemap.maxzoom ?? 19, attribution: props.attribution };
-    for (const o of props.layers) {
-      if (o.kind === "wms") sources[o.id] = { type: "raster", tiles: [wmsTiles(o.url, o.layers)], tileSize: 512, minzoom: o.minzoom ?? 0 };
-    }
+    for (const l of props.layers) sources[l.id] = { ...sourceFor(l), attribution: props.attribution(l.attributionKey, l.date) } as StyleSpecification["sources"][string];
     const style: StyleSpecification = {
       version: 8,
       sources,
       layers: [
+        { id: "blank", type: "background", paint: { "background-color": "#F4F3EE" } },
         { id: "streets", type: "raster", source: "streets", layout: { visibility: "none" } },
-        ...(sources.aerial ? [{ id: "aerial", type: "raster" as const, source: "aerial" }] : []),
-        ...props.layers
-          .filter((o) => o.kind === "wms")
-          .map((o) => ({
-            id: o.id,
-            type: "raster" as const,
-            source: o.id,
-            minzoom: o.kind === "wms" ? o.minzoom ?? 0 : 0,
-            paint: { "raster-opacity": o.kind === "wms" ? o.opacity ?? 0.8 : 1 },
-            layout: { visibility: (o.id.includes("zone") ? "none" : "visible") as "none" | "visible" },
-          })),
+        // basemaps first, then overlays in catalogue order
+        ...[...props.layers.filter((l) => l.role === "basemap"), ...props.layers.filter((l) => l.role === "overlay")].map((l) => ({
+          id: l.id,
+          type: "raster" as const,
+          source: l.id,
+          minzoom: l.minzoom ?? 0,
+          paint: { "raster-opacity": l.opacity ?? 1, "raster-fade-duration": 150 },
+          layout: { visibility: "none" as "none" | "visible" },
+        })),
       ],
     };
     const m = new maplibregl.Map({
@@ -87,10 +105,24 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       m.addLayer({ id: "selected-line", type: "line", source: "selected", paint: { "line-color": colors.plot, "line-width": 3 } });
       m.addLayer({ id: "footprint-fill", type: "fill", source: "footprint", paint: { "fill-color": colors.footprint, "fill-opacity": 0.45 } });
       m.addLayer({ id: "footprint-line", type: "line", source: "footprint", paint: { "line-color": colors.footprint, "line-width": 2 } });
+      m.addSource("measure", { type: "geojson", data: measureFc([], false) });
+      m.addLayer({ id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#7B2FF7", "fill-opacity": 0.15 } });
+      m.addLayer({ id: "measure-line", type: "line", source: "measure", filter: ["!=", "$type", "Point"], paint: { "line-color": "#7B2FF7", "line-width": 2.5, "line-dasharray": [3, 1.5] } });
+      m.addLayer({ id: "measure-pts", type: "circle", source: "measure", filter: ["==", "$type", "Point"], paint: { "circle-radius": 4.5, "circle-color": "#fff", "circle-stroke-color": "#7B2FF7", "circle-stroke-width": 2 } });
       loaded.current = true;
       sync();
     });
+    m.on("moveend", () => {
+      const c = m.getCenter();
+      latest.current.onMove?.({ lng: c.lng, lat: c.lat, zoom: m.getZoom() });
+    });
     m.on("click", (e) => {
+      const tool = latest.current.measure;
+      if (tool !== "none") {
+        measurePts.current = [...measurePts.current, [e.lngLat.lng, e.lngLat.lat]];
+        drawMeasure();
+        return;
+      }
       const hit = m.queryRenderedFeatures(e.point, { layers: ["neighbours-fill"] })[0];
       const id = hit?.properties?.["id"] as string | undefined;
       if (id && latest.current.onSelectNeighbour) latest.current.onSelectNeighbour(id);
@@ -114,17 +146,36 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     (m.getSource("selected") as GeoJSONSource).setData(fc(p.selected ? [{ geometry: p.selected }] : []));
     (m.getSource("neighbours") as GeoJSONSource).setData(fc(p.neighbours ?? []));
     (m.getSource("footprint") as GeoJSONSource).setData(fc(p.footprint ? [{ geometry: p.footprint }] : []));
-    const hasAerial = !!m.getLayer("aerial");
-    m.setLayoutProperty("streets", "visibility", p.basemap === "streets" || !hasAerial ? "visible" : "none");
-    if (hasAerial) m.setLayoutProperty("aerial", "visibility", p.basemap === "aerial" ? "visible" : "none");
-    for (const l of p.layers) if (l.kind === "wms" && l.id.includes("zone") && m.getLayer(l.id)) m.setLayoutProperty(l.id, "visibility", p.showZones ? "visible" : "none");
+    const base = p.basemap;
+    m.setLayoutProperty("streets", "visibility", base === "streets" ? "visible" : "none");
+    for (const l of p.layers) {
+      if (!m.getLayer(l.id)) continue;
+      const on = l.role === "basemap" ? l.id === base : p.overlays.includes(l.id);
+      m.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
+    }
+    m.getCanvas().style.cursor = p.measure !== "none" ? "crosshair" : "";
     if (p.tapped) {
       marker.current ??= new maplibregl.Marker({ color: colors.accent, scale: 0.7 });
       marker.current.setLngLat([p.tapped.lng, p.tapped.lat]).addTo(m);
     } else marker.current?.remove();
   }
 
-  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.showZones, props.tapped]);
+  function drawMeasure() {
+    const m = map.current;
+    if (!m || !loaded.current) return;
+    const tool = latest.current.measure;
+    const pts = measurePts.current;
+    (m.getSource("measure") as GeoJSONSource).setData(measureFc(pts, tool === "area"));
+    if (tool === "none" || pts.length === 0) return latest.current.onMeasure?.(null);
+    latest.current.onMeasure?.({ tool, points: pts.length, lengthM: pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0 });
+  }
+
+  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure]);
+  useEffect(() => {
+    measurePts.current = [];
+    drawMeasure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.measure, props.measureReset]);
 
   // frame the selected plot
   useEffect(() => {

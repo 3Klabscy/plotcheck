@@ -104,7 +104,33 @@ export const dlsRestParcels: ParcelProvider = {
     const first = parseRestParcels(await dlsGet(ctx, url, 15_000))[0];
     return first ? toParcel(first, fetchedAt, this.id, restSource, restRef(first.gmlId)) : null;
   },
+
+  /** As the DLS portal's "by plot" search: municipality + plot number, optionally quarter/sheet/block. */
+  async search(ctx, id, opts) {
+    const where = searchWhere(id);
+    if (!where) return [];
+    const limit = Math.min(opts?.limit ?? 50, 100);
+    const url = `${MAPSERVER}/${PARCEL_LAYER}/query?where=${encodeURIComponent(where)}&outFields=${REST_FIELDS}&returnGeometry=true&outSR=4326&resultRecordCount=${limit}&orderByFields=nationalCadastralRef&f=geojson`;
+    const fetchedAt = (ctx.now?.() ?? new Date()).toISOString();
+    return parseRestParcels(await dlsGet(ctx, url, 20_000)).map((r) => toParcel(r, fetchedAt, this.id, restSource, restRef(r.gmlId)));
+  },
 };
+
+const PART = /^[0-9A-Za-z/.]{1,20}$/;
+/** SQL filter for a partial reference. Every part is validated, so nothing user-typed reaches SQL unchecked. */
+export function searchWhere(id: Record<string, string | undefined>): string | null {
+  const muni = id["municipalityCode"]?.trim();
+  const plot = id["plot"]?.trim();
+  if (!muni || !/^\d{4}$/.test(muni) || !plot || !PART.test(plot)) return null;
+  const opt = (k: string) => {
+    const v = id[k]?.trim();
+    if (!v) return "%";
+    return PART.test(v) ? v : null;
+  };
+  const sheet = opt("sheetPlan"), quarter = opt("quarter"), block = opt("block");
+  if (sheet === null || quarter === null || block === null) return null;
+  return `nationalCadastralRef LIKE '${muni}-${sheet}-${quarter}-${block}-${plot}'`;
+}
 
 // ---------- Fallback: INSPIRE WFS 2.0 download service (standard, but ~20 s per query) ----------
 

@@ -5,7 +5,8 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
-import type { PlotMapHandle } from "../components/PlotMap.types";
+import { LayerPanel, MapToolbar } from "../components/MapControls";
+import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
 import { ResultView, UseOptions, reasonText } from "../components/Result";
 import { Button, Card, Loading, Notice, Row, SectionTitle, styles } from "../components/ui";
 import { api, ApiError, type AnalyseResponse, type CountryConfig, type ZonesResponse } from "../lib/api";
@@ -33,11 +34,17 @@ export default function Home() {
   const [zones, setZones] = useState<ZonesResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalyseResponse | null>(null);
   const [use, setUse] = useState<UseType>();
-  const [basemap, setBasemap] = useState<"aerial" | "streets">("aerial");
-  const [showZones, setShowZones] = useState(false);
+  const [basemap, setBasemap] = useState<string>();
+  const [overlays, setOverlays] = useState<string[]>();
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [measure, setMeasure] = useState<MeasureTool>("none");
+  const [measureReset, setMeasureReset] = useState(0);
+  const [measured, setMeasured] = useState<MeasureResult | null>(null);
+  const [candidates, setCandidates] = useState(false);
+  const view = useRef<{ lng: number; lat: number; zoom: number } | undefined>(undefined);
   const [mode, setMode] = useState<"map" | "details">("map");
-  // Deep link: /?lng=33.615&lat=34.93&z=18 opens the map there (shareable view).
-  const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string }>();
+  // Deep links: /?ref=<national ref> opens that plot; /?lng=33.615&lat=34.93&z=18 opens the map there.
+  const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string }>();
   const linkView = useMemo(() => {
     const lngQ = Number(q.lng), latQ = Number(q.lat), zQ = Number(q.z ?? 18);
     return Number.isFinite(lngQ) && Number.isFinite(latQ) && q.lng && q.lat
@@ -52,6 +59,8 @@ export default function Home() {
         const cy = countries[0];
         if (!cy) throw new ApiError("country_not_supported", 404);
         addCountryMessages(cy.messages);
+        setBasemap(cy.mapLayers.find((l) => l.role === "basemap" && l.defaultOn)?.id ?? "streets");
+        setOverlays(cy.mapLayers.filter((l) => l.role === "overlay" && l.defaultOn).map((l) => l.id));
         setConfig(cy);
       })
       .catch((e: ApiError) => setError(e.code ?? "generic"));
@@ -134,6 +143,26 @@ export default function Home() {
     }
   }, [config, selected, run, t]);
 
+  // open a shared plot link once
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (!config || !q.ref || openedRef.current) return;
+    openedRef.current = true;
+    void run(t("loading.parcel"), (signal) => api.parcelsById(config.code, { nationalRef: String(q.ref) }, signal)).then((r) => {
+      const p = r?.parcels[0];
+      if (!p) return;
+      setParcels([p]);
+      void selectParcel(p);
+    });
+  }, [config, q.ref, run, selectParcel, t]);
+
+  const shareUrl = () => {
+    const base = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
+    if (selected) return `${base}?ref=${encodeURIComponent(selected.nationalRef)}`;
+    const v = view.current;
+    return v ? `${base}?lng=${v.lng.toFixed(6)}&lat=${v.lat.toFixed(6)}&z=${v.zoom.toFixed(1)}` : base;
+  };
+
   if (!config) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, padding: 24 }}>
@@ -191,8 +220,21 @@ export default function Home() {
               region="4"
               onFound={(p) => {
                 setTapped(undefined);
+                setCandidates(false);
                 setParcels([p]);
                 void selectParcel(p);
+              }}
+              onCandidates={(ps) => {
+                setTapped(undefined);
+                setSelectedRef(undefined);
+                setParcels(ps);
+                setCandidates(true);
+                const pts = ps.flatMap((p) => (p.geometry.type === "Polygon" ? p.geometry.coordinates.flat() : p.geometry.coordinates.flat(2)) as number[][]);
+                mapRef.current?.fitBounds([Math.min(...pts.map((c) => c[0]!)), Math.min(...pts.map((c) => c[1]!)), Math.max(...pts.map((c) => c[0]!)), Math.max(...pts.map((c) => c[1]!))]);
+              }}
+              onStreet={(st) => {
+                setTapped(undefined);
+                mapRef.current?.fitBounds(st.bbox);
               }}
             />
           )}
@@ -326,28 +368,45 @@ export default function Home() {
         layers={config.mapLayers}
         initialView={linkView ?? config.defaultView}
         selected={selected?.geometry}
-        neighbours={step === "parcel" ? neighbours : []}
+        neighbours={step === "parcel" || (step === "tap" && candidates) ? neighbours : []}
         footprint={step === "result" ? result?.buildableFootprint : undefined}
         tapped={tapped}
-        basemap={basemap}
-        showZones={showZones}
-        onTap={onTap}
+        basemap={basemap ?? "streets"}
+        overlays={overlays ?? []}
+        measure={measure}
+        measureReset={measureReset}
+        onMeasure={setMeasured}
+        onMove={(v) => (view.current = v)}
+        onTap={(p) => {
+          setCandidates(false);
+          void onTap(p);
+        }}
         onSelectNeighbour={(id) => {
           const p = parcels.find((x) => x.nationalRef === id);
           if (p) void selectParcel(p);
         }}
-        attribution={t(config.mapLayers.find((l) => l.role === "basemap")?.attributionKey ?? "")}
+        attribution={(k, date) => (date ? `${t("map.orthoCredit", { date })}` : t(k))}
       />
-      <View style={{ position: "absolute", left: 10, top: 10, right: 52, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        {(["aerial", "streets"] as const).map((b) => (
-          <Pressable key={b} onPress={() => setBasemap(b)} style={{ backgroundColor: basemap === b ? colors.ink : "rgba(255,255,255,0.92)", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
-            <Text style={{ color: basemap === b ? "#fff" : colors.ink, fontSize: 12, fontWeight: "600" }}>{t(b === "aerial" ? "map.satellite" : "map.streets")}</Text>
-          </Pressable>
-        ))}
-        <Pressable onPress={() => setShowZones((s) => !s)} style={{ backgroundColor: showZones ? colors.ink : "rgba(255,255,255,0.92)", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 }}>
-          <Text style={{ color: showZones ? "#fff" : colors.ink, fontSize: 12, fontWeight: "600" }}>{t("map.zones")}</Text>
-        </Pressable>
-      </View>
+      <MapToolbar
+        measure={measure}
+        onMeasure={(m) => { setMeasure(m); setLayersOpen(false); }}
+        onClear={() => setMeasureReset((n) => n + 1)}
+        result={measured}
+        plot={step !== "tap" ? selected : undefined}
+        shareUrl={shareUrl}
+        layersOpen={layersOpen}
+        onLayers={() => setLayersOpen((o) => !o)}
+      />
+      {layersOpen && (
+        <LayerPanel
+          layers={config.mapLayers}
+          basemap={basemap ?? "streets"}
+          overlays={overlays ?? []}
+          onBasemap={setBasemap}
+          onToggle={(id) => setOverlays((o) => ((o ?? []).includes(id) ? (o ?? []).filter((x) => x !== id) : [...(o ?? []), id]))}
+          onClose={() => setLayersOpen(false)}
+        />
+      )}
     </View>
   );
 

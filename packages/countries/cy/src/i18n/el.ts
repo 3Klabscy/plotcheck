@@ -109,6 +109,22 @@ const messages: Record<string, string> = {
   "check.restriction.natura2000": "Δέουσα Εκτίμηση Natura 2000 με το Τμήμα Περιβάλλοντος",
   "check.restriction.forest": "Περιορισμοί με το Τμήμα Δασών",
   "check.restriction.coast": "Γραμμή Ζώνης Προστασίας της Παραλίας και απαιτούμενη απόσταση από τη θάλασσα",
+  "cy.layer.ortho": "Ορθοφωτοχάρτης",
+  "cy.layer.parcels": "Τεμάχια",
+  "cy.layer.buildings": "Κτίρια",
+  "cy.layer.quarters": "Ενορίες / τομείς",
+  "cy.layer.zones": "Πολεοδομικές ζώνες",
+  "cy.layer.flood": "Πλημμυρικές ζώνες (20/100/500 ετών)",
+  "cy.layer.seismic": "Σεισμικές ζώνες",
+  "cy.layer.geohazards": "Γεωλογικοί κίνδυνοι",
+  "cy.layer.shoreline": "Ακτογραμμή",
+  "cy.layer.protected": "Προστατευόμενες περιοχές (Natura 2000 κ.ά.)",
+  "cy.layer.geology": "Γεωλογία",
+  "cy.layer.roads": "Οδικό δίκτυο",
+  "cy.layer.water": "Δίκτυο ύδρευσης",
+  "cy.layer.sewer": "Αποχετευτικό δίκτυο",
+  "cy.layer.public": "Δημόσια κτίρια (σχολεία, νοσοκομεία, αστυνομία…)",
+  "cy.layer.admin": "Διοικητικά όρια",
 };
 
 export default messages;

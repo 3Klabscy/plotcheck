@@ -109,6 +109,22 @@ const messages: Record<string, string> = {
   "check.restriction.natura2000": "Natura 2000 Appropriate Assessment with the Department of Environment",
   "check.restriction.forest": "Restrictions with the Forest Department",
   "check.restriction.coast": "Coastal Protection Zone line and required distance from the sea",
+  "cy.layer.ortho": "Orthophoto",
+  "cy.layer.parcels": "Plots",
+  "cy.layer.buildings": "Buildings",
+  "cy.layer.quarters": "Quarters / sections",
+  "cy.layer.zones": "Planning zones",
+  "cy.layer.flood": "Flood zones (20/100/500-year)",
+  "cy.layer.seismic": "Seismic zones",
+  "cy.layer.geohazards": "Geological hazards",
+  "cy.layer.shoreline": "Shoreline",
+  "cy.layer.protected": "Protected areas (Natura 2000 etc.)",
+  "cy.layer.geology": "Geology",
+  "cy.layer.roads": "Road network",
+  "cy.layer.water": "Water network",
+  "cy.layer.sewer": "Sewer network",
+  "cy.layer.public": "Public buildings (schools, hospitals, police…)",
+  "cy.layer.admin": "Administrative boundaries",
 };
 
 export default messages;

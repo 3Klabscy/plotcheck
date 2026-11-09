@@ -198,6 +198,12 @@ export function createApi(deps: ApiDeps) {
       return idx;
     }
 
+    if (req.method === "GET" && path === "/v1/streets") {
+      const c = getCountry(url.searchParams.get("country") ?? "");
+      const q = (url.searchParams.get("q") ?? "").slice(0, 60);
+      return { country: c.code, streets: c.streetSearch?.(q, { limit: 12 }) ?? [] };
+    }
+
     if (req.method !== "POST") throw new HttpError(405, "method_not_allowed");
     const b = body<Record<string, unknown>>(await req.json().catch(() => null));
 
@@ -222,6 +228,20 @@ export function createApi(deps: ApiDeps) {
       if (!ref) throw new HttpError(400, "invalid_identifiers");
       const parcel = await parcelByRef(country, ref, req.signal);
       return { country: country.code, parcels: [parcel] };
+    }
+
+    if (path === "/v1/parcels/search") {
+      const ids = b["identifiers"];
+      if (!ids || typeof ids !== "object") throw new HttpError(400, "invalid_identifiers");
+      const clean = Object.fromEntries(Object.entries(ids as Record<string, unknown>).filter(([, v]) => typeof v === "string" && v.length <= 40).map(([k, v]) => [k, (v as string).trim()]));
+      const providers = country.parcelProviders.filter((p) => p.enabled && p.search);
+      if (providers.length === 0) throw new HttpError(404, "search_not_supported");
+      const key = `search:${country.code}:${JSON.stringify(Object.entries(clean).sort())}`;
+      const { value } = await cached(deps.cache, key, TTL.parcel, async () => {
+        const { result } = await withFallback(providers, (prov) => prov.search!(ctx(req.signal), clean, { limit: 50 }), (r) => r.length === 0);
+        return result ?? [];
+      });
+      return { country: country.code, parcels: value };
     }
 
     const ref = str(b["nationalRef"], "nationalRef");
