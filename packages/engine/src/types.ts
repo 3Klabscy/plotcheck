@@ -39,6 +39,8 @@ export interface Site {
   geometry?: PolygonGeometry;
   /** Legal area from the cadastre if known; otherwise computed from the geometry. */
   officialAreaM2?: number;
+  /** Public road access detected from road data (country module). */
+  roadAccess?: "yes" | "no" | "unknown";
 }
 
 export interface AnalysisInput {

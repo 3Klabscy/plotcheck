@@ -1,4 +1,4 @@
-import type { Parcel, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
+import type { Parcel, SiteContext, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
 import type { AnalysisParams, AnalysisResult } from "@plotcheck/engine";
 
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
@@ -31,6 +31,7 @@ export interface ParcelsResponse {
 export interface ZonesResponse {
   parcel: Parcel;
   zones: ZoneHit[];
+  site?: SiteContext;
   primary?: { zone: ZoneHit; rules: ZoneRuleSet; coverage: "curated" | "source_only"; mismatches: Mismatch[] };
 }
 
@@ -46,6 +47,7 @@ export interface AnalyseResponse {
   otherZones: ZoneHit[];
   coverage: "curated" | "source_only";
   mismatches: Mismatch[];
+  site?: SiteContext;
   rules: ZoneRuleSet;
   params: AnalysisParams;
   results: AnalysisResult[];

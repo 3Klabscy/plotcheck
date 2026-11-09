@@ -46,7 +46,7 @@ export const cyCountryLayer: RuleLayer = {
 
 const PREFIX_SOURCE: Provenance = {
   source: "Zone-code convention (first letter of the Cyprus zone code)",
-  sourceRef: "Κ=residential, Ε=commercial, Π=core/mixed, Τ=tourist, Γ=agricultural, Ζ=protection, Β=industrial",
+  sourceRef: "Κ=residential, Ε=commercial, Π=core/mixed, Τ=tourist, Γ=agricultural, Ζ=protection, Β=industrial, Α=public uses",
   status: "needs_review",
 };
 
@@ -59,6 +59,8 @@ const BY_PREFIX: Record<string, UseRule> = {
   "Γ": { allowed: [], conditional: ["house"] },
   "Ζ": { allowed: [], conditional: [] },
   "Β": { allowed: [], conditional: ["commercial"] },
+  // Αα: "other public uses" (stadia, schools, government buildings) — not for private development
+  "Α": { allowed: [], conditional: [] },
 };
 
 /** Permitted uses from the zone code prefix; unknown prefixes → null (engine says "maybe"). */

@@ -183,5 +183,10 @@ const en: Record<string, string> = {
   "reason.unit_size_small": "The assumed {{type}} size ({{size}} m²) is below the plan minimum of {{min}} m² usable area.",
   "reason.studio_share": "Studios may not exceed {{share}}% of the units in developments of 5 or more units.",
   "constraint.unit_size": "Minimum dwelling sizes",
+  "plot.frontage": "Fronts",
+  "plot.postcode": "Postcode",
+  "plot.noRoad": "No public road along the plot boundary was found in the road data — check legal access to a public road.",
+  "reason.no_road_access": "No public road access detected; a building permit requires access to a public road.",
+  "check.engineer.road_access": "Legal access to a public road",
 };
 export default en;

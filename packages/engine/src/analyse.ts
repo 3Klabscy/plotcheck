@@ -84,6 +84,11 @@ export function analyse(input: AnalysisInput): AnalysisResult {
     toBeChecked.add("check.engineer.area");
   }
 
+  if (site.roadAccess === "no") {
+    checks.push({ id: "road_access", status: "maybe", reasonKey: "reason.no_road_access" });
+    toBeChecked.add("check.engineer.road_access");
+  }
+
   // ---- 2. Use permitted
   const uses = rules.uses_allowed;
   if (uses.provenance.status !== "verified") needsReview.push({ constraint: "uses_allowed", provenance: uses.provenance });
@@ -263,7 +268,7 @@ export function analyse(input: AnalysisInput): AnalysisResult {
     const sellableM2 = round(residentialGfa * params.netToGross, 0);
     const { total, byType } = unitEstimate(sellableM2, params.unitMix, params.unitSizeM2);
     result.units = { sellableM2, total, byType, parking: parking(total) };
-    if (total === 0) checks.push({ id: "units", status: "not_allowed", reasonKey: "reason.no_units" });
+    if (total === 0) checks.push({ id: "units", status: allowedFloors === 0 ? "maybe" : "not_allowed", reasonKey: allowedFloors === 0 ? "reason.floors_unknown" : "reason.no_units" });
     const dw = rules.dwellings;
     if (dw && total > 0) {
       if (dw.provenance.status !== "verified") needsReview.push({ constraint: "unit_size", provenance: dw.provenance });

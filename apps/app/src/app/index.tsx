@@ -183,6 +183,17 @@ export default function Home() {
           )}
           <Row label={t("plot.ref")} value={selected.nationalRef} />
           {selected.officialAreaM2 !== undefined && <Row label={t("plot.area")} value={fmtArea(selected.officialAreaM2, lng)} />}
+          {zones?.site && (
+            <>
+              {zones.site.frontage.filter((f) => f.name).map((f) => (
+                <Row key={f.name!} label={t("plot.frontage")} value={`${f.name} · ${fmtNumber(f.lengthM, lng)} m`} />
+              ))}
+              {zones.site.postcodes.length > 0 && <Row label={t("plot.postcode")} value={zones.site.postcodes.join(" / ")} />}
+              {zones.site.roadAccess === "no" && (
+                <Text style={[styles.small, { color: colors.notAllowed, marginTop: 6 }]} testID="no-road">{t("plot.noRoad")}</Text>
+              )}
+            </>
+          )}
           {zone && (
             <>
               <Row label={t("plot.zone")} value={zone.zoneCode} strong />

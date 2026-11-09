@@ -61,7 +61,21 @@ don't apply in Areas of Special Character or Antiquities-controlled areas. Combi
 - **Reductions** (Order 4/2026 §5.8): the authority may reduce the upper-floor distances; this
   is used in the relaxed scenario.
 
-### Street frontage (Larnaca)
+### Road access, street names and postcodes (Larnaca)
+
+`packages/countries/cy/src/larnaca/roads.ts` provides, for every plot in the Larnaca map area,
+the streets it fronts (with length), their postcodes and a road-access check. If no road runs
+along the plot boundary, the app shows a "no public road access" warning.
+
+- **Road geometry:** 5,266 DLS road segments.
+- **Names:** 988 street names, read from the DLS 1:10,000 road-map labels. The map was
+  georeferenced to about 1.5 m and its labels rebuilt from fragments.
+- **Official spellings and postcodes:** from Cyprus Post.
+- **Accuracy:** on the plan streets, 96% of the named length is correctly named. About half the
+  length is still unnamed, where the map has no label nearby, so the OSM plan streets remain a
+  second source for the city-centre bonuses.
+
+### Street frontage (Larnaca, OSM plan streets)
 
 `packages/countries/cy/src/larnaca/frontage.ts` detects which plan street a plot fronts, using
 OSM street geometry (© OpenStreetMap contributors, ODbL, bundled extract dated 2026-11-09). These

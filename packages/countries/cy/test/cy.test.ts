@@ -18,6 +18,7 @@ import {
   cyRelaxationsFor,
   larnacaStreetFrontage,
   parseRestParcels,
+  cySiteContext,
 } from "../src/index.ts";
 
 const fx = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -225,5 +226,25 @@ describe("Cyprus relaxations catalogue", () => {
     for (const r of all) for (const lng of ["el", "en"]) for (const k of [r.titleKey, r.grantKey, r.conditionsKey, r.cost?.noteKey, r.statusNoteKey].filter(Boolean) as string[]) {
       expect(cyprus.messages[lng]![k], `${lng}:${k}`).toBeTruthy();
     }
+  });
+});
+
+describe("Larnaca site context (DLS roads + Cyprus Post)", () => {
+  const site = (file: string, ref: string) => {
+    const r = parseRestParcels(fx(file)).find((x) => x.nationalRef === ref)!;
+    return cySiteContext({ geometry: r.geometry, identifiers: parseNationalRef(ref)!, nationalRef: ref } as never)!;
+  };
+  it("finds road access, street names and postcodes", () => {
+    const s = site("rest-query-bbox.geojson", "4000-40/56W1-3-1-666");
+    expect(s.roadAccess).toBe("yes");
+    expect(s.frontage.map((f) => f.name)).toEqual(expect.arrayContaining(["Κοζάνης", "Πηνελόπης Δέλτα"]));
+    expect(s.postcodes).toEqual([6047]);
+  });
+  it("tags plan-street frontage from DLS names", () => {
+    expect(site("rest-makariou.geojson", "4000-41/490403-2-4-905").tags).toContain("cy.lca:axis");
+    expect(site("rest-ermou.geojson", "4000-41/570103-1-4-545").tags).toContain("cy.lca:kep");
+  });
+  it("returns nothing outside the covered map area", () => {
+    expect(cySiteContext({ geometry: { type: "Polygon", coordinates: [[[33.0, 34.7], [33.001, 34.7], [33.001, 34.701], [33.0, 34.7]]] }, identifiers: {} } as never)).toBeUndefined();
   });
 });

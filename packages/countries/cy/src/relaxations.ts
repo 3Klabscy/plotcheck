@@ -1,4 +1,4 @@
-import type { Parcel, Provenance, Relaxation, UseType, ZoneHit } from "@plotcheck/core";
+import type { Parcel, Provenance, Relaxation, SiteContext, UseType, ZoneHit } from "@plotcheck/core";
 import { larnacaStreetFrontage } from "./larnaca/frontage.ts";
 import { isContinuousBuilding } from "./rules.ts";
 
@@ -380,11 +380,12 @@ const isLcaResidentialZone = (z: ZoneHit) => /^(Κα|Πα|ΚΓ)/.test(z.zoneCode
 export interface CyRelaxationContext {
   baseFar?: number;
   parcel?: Parcel;
+  site?: SiteContext;
 }
 
 /** All relaxations that may apply to a plot in this zone. The engine decides how they combine. */
 export function cyRelaxationsFor(zone: ZoneHit, ctx: CyRelaxationContext | number = {}): Relaxation[] {
-  const { baseFar, parcel } = typeof ctx === "number" ? { baseFar: ctx, parcel: undefined } : ctx;
+  const { baseFar, parcel, site } = typeof ctx === "number" ? { baseFar: ctx, parcel: undefined, site: undefined } : ctx;
   const out: Relaxation[] = [verandas, basement, pilotis, roofAttic, coverageAdjust, upperSetbacks, slopeFloor, recovery, familyFloor];
   if (!isCoreOrHistoric(zone)) out.push(officeHeight);
   out.push(extraFloors(isPolicyStatement(zone) ? 1 : 2));
@@ -401,9 +402,10 @@ export function cyRelaxationsFor(zone: ZoneHit, ctx: CyRelaxationContext | numbe
   }
 
   // Larnaca Local Plan
+  // plan-street frontage: DLS-named roads (site tags) or the OSM extract
   const frontage = parcel ? larnacaStreetFrontage(parcel) : [];
-  const onKep = frontage.some((f) => f.group === "kep");
-  const onAxis = frontage.some((f) => f.group === "axis");
+  const onKep = frontage.some((f) => f.group === "kep") || !!site?.tags.includes("cy.lca:kep");
+  const onAxis = frontage.some((f) => f.group === "axis") || !!site?.tags.includes("cy.lca:axis");
   const inUrbanCentreStreet = onKep || onAxis;
 
   if (inUrbanCentreStreet && !isCoreOrHistoric(zone)) {

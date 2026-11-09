@@ -5,6 +5,7 @@ import { DLS_BASE, DLS_INSPIRE } from "./dls/http.ts";
 import { cyPlotIdSchema } from "./plotId.ts";
 import { cyRuleLayers, cySourceLayer, cyUsesForZone } from "./rules.ts";
 import { cyRelaxationsFor } from "./relaxations.ts";
+import { cySiteContext } from "./site.ts";
 import el from "./i18n/el.ts";
 import en from "./i18n/en.ts";
 
@@ -24,6 +25,7 @@ export const cyprus: CountryModule = {
   usesForZone: cyUsesForZone,
   sourceLayerForZone: cySourceLayer,
   relaxationsFor: cyRelaxationsFor,
+  siteContext: async (_ctx, parcel) => cySiteContext(parcel),
   coverage: [{ dist_abbr: "Κα4", planName: "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ", status: "curated" }],
   defaults: {
     storeyHeightM: 3.2,
@@ -72,5 +74,6 @@ export { parseRestParcels } from "./dls/parcels.ts";
 export * from "./plotId.ts";
 export * from "./rules.ts";
 export * from "./relaxations.ts";
+export { cySiteContext } from "./site.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";
 export { mapZoneAttributes, samplePoints, toZoneHit } from "./dls/zones.ts";

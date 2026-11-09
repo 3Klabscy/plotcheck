@@ -229,3 +229,20 @@ export interface Relaxation {
   statusNoteKey?: string;
   provenance: Provenance;
 }
+
+// ---------- Site context (road access, frontage, postcodes) ----------
+
+export interface SiteFrontage {
+  name: string | null; // official street name, null if the road is unnamed in the data
+  lengthM: number;
+  postcodes: number[];
+}
+
+export interface SiteContext {
+  roadAccess: "yes" | "no" | "unknown";
+  frontage: SiteFrontage[];
+  postcodes: number[];
+  /** Country-specific tags used by rule selection (e.g. "cy.lca:axis"). */
+  tags: string[];
+  provenance: Provenance;
+}

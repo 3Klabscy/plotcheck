@@ -1,4 +1,4 @@
-import { resolveRules, USE_TYPES, type LngLat, type Parcel, type UseType, type ZoneHit, type ZoneRuleSet } from "@plotcheck/core";
+import { resolveRules, USE_TYPES, type LngLat, type Parcel, type SiteContext, type UseType, type ZoneHit, type ZoneRuleSet } from "@plotcheck/core";
 import { analyse, compareScenarios, type AnalysisParams, type AnalysisResult } from "@plotcheck/engine";
 import {
   AllProvidersFailedError,
@@ -77,6 +77,7 @@ function mergeParams(base: AnalysisParams, raw: unknown): AnalysisParams {
 export interface ZonesResponse {
   parcel: Parcel;
   zones: ZoneHit[];
+  site?: SiteContext;
   primary?: { zone: ZoneHit; rules: ZoneRuleSet; coverage: "curated" | "source_only"; mismatches: Mismatch[] };
 }
 export interface Mismatch {
@@ -122,8 +123,9 @@ export function createApi(deps: ApiDeps) {
       const { result } = await withFallback(country.planningProviders, (prov) => prov.zonesFor(ctx(signal), parcel), (r) => r.length === 0);
       return result;
     });
+    const site = country.siteContext ? await country.siteContext(ctx(signal), parcel).catch(() => undefined) : undefined;
     const zone = zones[0];
-    if (!zone) return { parcel, zones };
+    if (!zone) return { parcel, zones, ...(site ? { site } : {}) };
     const layers = [...country.ruleLayers, ...(country.sourceLayerForZone ? [country.sourceLayerForZone(zone)] : [])];
     const rules = resolveRules(zone.jurisdiction, zone.zoneCode, layers, zone.planRef);
     // Compare curated values with what the source publishes today (catches plan changes).
@@ -134,7 +136,7 @@ export function createApi(deps: ApiDeps) {
         if (typeof curated === "number" && Math.abs(curated - published) > 1e-9) mismatches.push({ constraint: name, curated, published });
       }
     }
-    return { parcel, zones, primary: { zone, rules, coverage: rules.curated ? "curated" : "source_only", mismatches } };
+    return { parcel, zones, ...(site ? { site } : {}), primary: { zone, rules, coverage: rules.curated ? "curated" : "source_only", mismatches } };
   }
 
   // ---------- routes ----------
@@ -190,9 +192,9 @@ export function createApi(deps: ApiDeps) {
       const z = await zonesFor(country, parcel, req.signal);
       if (!z.primary) throw new HttpError(422, "no_zone", "No planning zone found for this plot");
       const params = mergeParams(defaultParams(country), b["params"]);
-      const site = { geometry: parcel.geometry, officialAreaM2: parcel.officialAreaM2 };
+      const site = { geometry: parcel.geometry, officialAreaM2: parcel.officialAreaM2, ...(z.site ? { roadAccess: z.site.roadAccess } : {}) };
       const baseFar = z.primary.rules.constraints.far?.max_val?.[0]?.expression;
-      const relaxations = country.relaxationsFor?.(z.primary.zone, { baseFar: typeof baseFar === "number" ? baseFar : undefined, parcel }) ?? [];
+      const relaxations = country.relaxationsFor?.(z.primary.zone, { baseFar: typeof baseFar === "number" ? baseFar : undefined, parcel, ...(z.site ? { site: z.site } : {}) }) ?? [];
       const useRaw = b["use"];
       let results: AnalysisResult[];
       if (useRaw === "all") results = compareScenarios({ site, rules: z.primary.rules, params, relaxations });
@@ -204,6 +206,7 @@ export function createApi(deps: ApiDeps) {
         parcel,
         zone: z.primary.zone,
         otherZones: z.zones.slice(1),
+        site: z.site,
         coverage: z.primary.coverage,
         mismatches: z.primary.mismatches,
         rules: z.primary.rules,
