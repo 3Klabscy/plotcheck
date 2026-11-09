@@ -6,6 +6,7 @@ import { cyPlotIdSchema } from "./plotId.ts";
 import { cyRuleLayers, cySourceLayer, cyUsesForZone } from "./rules.ts";
 import { cyRelaxationsFor } from "./relaxations.ts";
 import { cySiteContext } from "./site.ts";
+import { cyFinanceDefaults } from "./finance.ts";
 import { cyRestrictionLayers, larnacaNoiseFor } from "./restrictions.ts";
 import el from "./i18n/el.ts";
 import en from "./i18n/en.ts";
@@ -28,6 +29,7 @@ export const cyprus: CountryModule = {
   sourceLayerForZone: cySourceLayer,
   relaxationsFor: cyRelaxationsFor,
   siteContext: async (_ctx, parcel) => cySiteContext(parcel),
+  financeDefaults: cyFinanceDefaults,
   coverage: [{ dist_abbr: "Κα4", planName: "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ", status: "curated" }],
   defaults: {
     storeyHeightM: 3.2,
@@ -37,7 +39,7 @@ export const cyprus: CountryModule = {
     minRowHouseWidthM: 6.5,
   },
   legal: { disclaimerKey: "cy.disclaimer", attributionKeys: ["cy.attribution.dls"] },
-  features: { docScan: false, plotIdSearch: false, restrictions: true, financials: false, brokering: false, ads: false },
+  features: { docScan: false, plotIdSearch: true, restrictions: true, financials: true, brokering: false, ads: false },
   mapLayers: [
     {
       id: "cy-ortho-2019",
@@ -78,5 +80,6 @@ export * from "./rules.ts";
 export * from "./relaxations.ts";
 export { cySiteContext } from "./site.ts";
 export * from "./restrictions.ts";
+export { cyFinanceDefaults, officialLandValue } from "./finance.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";
 export { mapZoneAttributes, samplePoints, toZoneHit } from "./dls/zones.ts";

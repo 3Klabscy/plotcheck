@@ -134,6 +134,15 @@ export interface LegalTexts {
 
 export type FeatureFlag = "docScan" | "plotIdSearch" | "restrictions" | "financials" | "brokering" | "ads";
 
+export interface FinanceDefaults {
+  /** Default financial parameters per building type (engine FinanceParams shape). */
+  byUse: Record<UseType, import("@plotcheck/engine").FinanceParams>;
+  finishFactor: Record<"basic" | "standard" | "high", number>;
+  officialLandValue?: { perM2Buildable: number; perM2BuildableGround: number; far: number; total: number; areaKey: string; date: string; source: { label: string; url: string } };
+  sources: { label: string; url: string }[];
+  notes: string[];
+}
+
 export interface CountryModule {
   code: string; // ISO 3166-1 alpha-2
   nameKey: string;
@@ -153,6 +162,8 @@ export interface CountryModule {
   usesForZone?(zone: ZoneHit): { value: UseType[] | null; conditional: UseType[]; provenance: Provenance };
   /** Planning relaxations/incentives that may apply to a plot in this zone (island-wide + area). */
   relaxationsFor?(zone: ZoneHit, ctx: { baseFar?: number; parcel?: Parcel; site?: SiteContext }): Relaxation[];
+  /** Financial defaults for a plot (prices, costs, fees) and its official land value. */
+  financeDefaults?(parcel: Parcel, zone: ZoneHit | undefined): FinanceDefaults;
   /** Restrictions that follow from the zone itself (e.g. airport noise zones). */
   restrictionsForZone?(zone: ZoneHit): RestrictionHit[];
   /** Road access, frontage and postcodes for a plot, where the country has the data. */

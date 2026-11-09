@@ -1,5 +1,5 @@
 import type { Parcel, SiteContext, ZoneHit, ZoneRuleSet, UseType } from "@plotcheck/core";
-import type { AnalysisParams, AnalysisResult } from "@plotcheck/engine";
+import type { AnalysisParams, AnalysisResult, FinanceParams } from "@plotcheck/engine";
 
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
@@ -74,7 +74,16 @@ export interface AnalyseResponse {
   rules: ZoneRuleSet;
   params: AnalysisParams;
   results: AnalysisResult[];
+  finance?: FinanceDefaults;
   disclaimerKey: string;
+}
+
+export interface FinanceDefaults {
+  byUse: Record<UseType, FinanceParams>;
+  finishFactor: Record<"basic" | "standard" | "high", number>;
+  officialLandValue?: { perM2Buildable: number; perM2BuildableGround: number; far: number; total: number; areaKey: string; date: string; source: { label: string; url: string } };
+  sources: { label: string; url: string }[];
+  notes: string[];
 }
 
 export class ApiError extends Error {

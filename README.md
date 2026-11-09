@@ -29,6 +29,13 @@ be built on it. Web only in phase 1, built on the multi-country architecture fro
   available relaxations and incentives applied: Order 4/2026, the RES bonus, the affordable-
   housing scheme, and Larnaca Local Plan incentives. Each is cited with its rule, conditions and
   cost. See [`docs/RELAXATIONS.md`](docs/RELAXATIONS.md).
+- **Financial feasibility (Larnaca).** For the chosen building type, with or without the
+  relaxations, the app estimates sales value, construction and soft costs, the maximum land
+  price that still leaves the developer's target profit (residual land value, after DLS transfer
+  fees), profit and margin at an asking price, and rental yield. Sale price, construction cost,
+  finish level, basements and profit target are editable and recompute on the device. The DLS
+  General Valuation (1/1/2021) value for the plot's area and zone is shown for comparison. All
+  figures are estimates, ex-VAT, with sources listed.
 - **Trust.** Every unverified value is listed under a warning, together with its source. Every
   result shows the "to be checked by an engineer" list and the disclaimer.
 - **Greek and English** throughout, with local number formats.
@@ -91,7 +98,8 @@ issued (phase 2). Point the app at the function with
 - Permitted uses come from the zone-code letter (a heuristic, flagged for review).
 - A single uniform boundary setback is used. Front setbacks and street alignment are flagged
   for an engineer to check.
-- Not built yet: restriction layers, plot-number search, document scan, financials, paywall.
+- Not built yet: document scan, PDF export, paywall. Finance defaults are listing-based
+  estimates for Larnaca; they are not a valuation.
 - OSM street tiles are for the prototype only. "PlotCheck" is a placeholder brand.
 - Greek copy needs review by a native speaker.
 

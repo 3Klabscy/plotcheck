@@ -7,3 +7,4 @@ web-build/
 .env.*
 !.env.example
 coverage/
+*.tsbuildinfo

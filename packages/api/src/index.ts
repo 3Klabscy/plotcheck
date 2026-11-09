@@ -254,6 +254,7 @@ export function createApi(deps: ApiDeps) {
         otherZones: z.zones.slice(1),
         site: z.site,
         restrictions: z.restrictions,
+        finance: country.financeDefaults?.(parcel, z.primary.zone),
         coverage: z.primary.coverage,
         mismatches: z.primary.mismatches,
         rules: z.primary.rules,

@@ -8,3 +8,6 @@ export const fmtArea = (m2: number, lng: string, digits = 0) => `${fmtNumber(m2,
 
 export const fmtPercent = (ratio: number, lng: string) =>
   new Intl.NumberFormat(localeTag(lng), { style: "percent", maximumFractionDigits: 1 }).format(ratio);
+
+export const fmtMoney = (n: number, lng: string, currency = "EUR") =>
+  new Intl.NumberFormat(localeTag(lng), { style: "currency", currency, maximumFractionDigits: 0 }).format(n);

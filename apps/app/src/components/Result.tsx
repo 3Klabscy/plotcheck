@@ -8,6 +8,7 @@ import { fmtArea, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, StatusBadge, styles } from "./ui";
 import { RelaxationsView } from "./Relaxations";
+import { FinanceView } from "./Finance";
 
 /** Translate engine reason params: use keys → names, numbers → local format. */
 export function reasonText(t: TFunction, lng: string, c: Pick<Check, "reasonKey" | "params">): string {
@@ -169,6 +170,8 @@ export function ResultView({ data, result }: { data: AnalyseResponse; result: An
           </View>
         )}
       </Card>
+
+      <FinanceView data={data} result={result} />
 
       <Card>
         <SectionTitle>{t("result.toBeChecked")}</SectionTitle>
