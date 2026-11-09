@@ -255,6 +255,12 @@ export default function Home() {
                 <Row key={f.name!} label={t("plot.frontage")} value={`${f.name} · ${fmtNumber(f.lengthM, lng)} m`} />
               ))}
               {zones.site.postcodes.length > 0 && <Row label={t("plot.postcode")} value={zones.site.postcodes.join(" / ")} />}
+              {zones.site.elevation && (
+                <Row
+                  label={t("plot.elevation")}
+                  value={`${zones.site.elevation.maxM - zones.site.elevation.minM < 0.5 ? `${fmtNumber(zones.site.elevation.meanM, lng, 1)}` : `${fmtNumber(zones.site.elevation.minM, lng, 1)}–${fmtNumber(zones.site.elevation.maxM, lng, 1)}`} m · ${t("plot.elevationSource", { source: zones.site.elevation.source })}`}
+                />
+              )}
               {zones.site.roadAccess === "no" && (
                 <Text style={[styles.small, { color: colors.notAllowed, marginTop: 6 }]} testID="no-road">{t("plot.noRoad")}</Text>
               )}

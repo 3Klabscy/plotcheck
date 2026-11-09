@@ -300,5 +300,7 @@ const el: Record<string, string> = {
   "search.matches_other": "Βρέθηκαν {{count}} τεμάχια — επιλέξτε ένα (φαίνονται και στον χάρτη)",
   "search.matchLine": "Τεμάχιο {{plot}} · φύλλο/σχέδιο {{sheet}} · τμήμα {{block}}",
   "map.orthoCredit": "Ορθοφωτοχάρτης {{date}} © ΤΚΧ Κύπρου",
+  "plot.elevation": "Υψόμετρο εδάφους",
+  "plot.elevationSource": "ΤΚΧ {{source}}",
 };
 export default el;

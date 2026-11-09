@@ -5,6 +5,8 @@ import type { LngLat, Parcel, Provenance } from "@plotcheck/core";
 import type { ProviderContext, RestrictionHit, RestrictionLayer } from "@plotcheck/country-sdk";
 import { DLS_INSPIRE, dlsGet } from "./dls/http.ts";
 import { samplePoints } from "./dls/zones.ts";
+import { groundElevation } from "./dls/elevation.ts";
+import { elevationPoints } from "./site.ts";
 
 /**
  * Restriction layers for Cyprus (researched 2026-11-09). Each hit carries its effect and source;
@@ -71,18 +73,6 @@ const polyQuery = (parcel: Parcel, outFields: string) => ({
   outFields,
   returnGeometry: "false",
 });
-
-async function getJson(ctx: ProviderContext, url: string, timeoutMs = 20_000): Promise<unknown> {
-  const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const res = await ctx.fetch(url, { signal: ac.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(t);
-  }
-}
 
 // ---------- Natura 2000 (EEA, EU-wide) ----------
 const EEA_N2K = "https://bio.discomap.eea.europa.eu/arcgis/rest/services/ProtectedSites/Natura2000Sites/MapServer/2/query";
@@ -283,16 +273,6 @@ function inPsz(lng: number, lat: number, w: number, len: number): boolean {
   return false;
 }
 
-async function groundElevation(ctx: ProviderContext, p: LngLat): Promise<number | undefined> {
-  if (ctx.env("ELEVATION_PROVIDER") !== "open-meteo") return undefined;
-  try {
-    const d = (await getJson(ctx, `https://api.open-meteo.com/v1/elevation?latitude=${p.lat}&longitude=${p.lng}`, 8000)) as { elevation?: number[] };
-    return d.elevation?.[0];
-  } catch {
-    return undefined;
-  }
-}
-
 export const larnacaAirport: RestrictionLayer = {
   id: "airport",
   kind: "airport_height",
@@ -309,20 +289,32 @@ export const larnacaAirport: RestrictionLayer = {
       hits.push({ layerId: "airport:psz2", kind: "airport_height", severity: "critical", messageKey: "cy.restrict.psz2",
         effect: { type: "block", reason: "Public Safety Zone 350×3,500 m" }, provenance: prov("Larnaca Local Plan 2019 §32.4.1(β) — zone geometry approximated from the stated dimensions", LP, "§32.4.1") });
     }
-    const ols = all.map((p) => olsHeightAboveAerodrome(p.lng, p.lat)).filter((x) => x !== undefined);
+    const ols = all.map((p) => ({ p, s: olsHeightAboveAerodrome(p.lng, p.lat) })).filter((x) => x.s !== undefined) as { p: LngLat; s: { height: number; surface: string } }[];
     if (ols.length) {
-      const low = ols.reduce((m, c) => (c.height < m.height ? c : m));
-      const altitude = Math.round((LCLK.elevM + low.height) * 10) / 10;
-      const ground = await groundElevation(ctx, pts[0]!);
-      const maxHeight = ground !== undefined ? Math.round((altitude - ground) * 10) / 10 : undefined;
+      const low = ols.reduce((m, c) => (c.s.height < m.s.height ? c : m));
+      const altitude = Math.round((LCLK.elevM + low.s.height) * 10) / 10;
+      // Allowed building height at each point = surface altitude − ground there (DLS terrain model);
+      // the plot's limit is the lowest of these.
+      // ground is sampled at the same ≤17 points as the plot's elevation (shared cache), not every vertex
+      const gpts = elevationPoints(parcel).map((p) => ({ p, s: olsHeightAboveAerodrome(p.lng, p.lat) })).filter((x) => x.s !== undefined) as typeof ols;
+      const grounds = await Promise.all(gpts.map((x) => groundElevation(ctx, x.p).catch(() => undefined)));
+      const caps = gpts.map((x, i) => (grounds[i] ? { cap: LCLK.elevM + x.s.height - grounds[i]!.elevationM, ground: grounds[i]!.elevationM, src: grounds[i]!.source } : undefined)).filter((c) => c !== undefined);
+      // conservative: also the lowest surface anywhere on the plot over its highest sampled ground
+      const highest = caps.length ? caps.reduce((m, c) => (c.ground > m.ground ? c : m)) : undefined;
+      if (highest) caps.push({ ...highest, cap: altitude - highest.ground });
+      const worst = caps.length ? caps.reduce((m, c) => (c.cap < m.cap ? c : m)) : undefined;
+      const maxHeight = worst ? Math.max(0, Math.floor(worst.cap * 10) / 10) : undefined;
       hits.push({
         layerId: "airport:ols",
         kind: "airport_height",
         severity: "warning",
         messageKey: maxHeight !== undefined ? "cy.restrict.olsHeight" : "cy.restrict.olsAltitude",
-        params: { altitude, surface: low.surface, ...(maxHeight !== undefined ? { height: maxHeight, ground: Math.round(ground!) } : {}) },
+        params: { altitude, surface: low.s.surface, ...(worst ? { height: maxHeight!, ground: Math.round(worst.ground * 10) / 10 } : {}) },
         effect: maxHeight !== undefined ? { type: "cap_height", maxHeightM: maxHeight } : { type: "info" },
-        provenance: prov("ICAO Annex 14 obstacle limitation surfaces (code 4 precision runway), LCLK runway 04/22 — indicative; Department of Civil Aviation consent required", "https://www.icao.int/safety/airnavigation/nationalitycodes/pages/annex14.aspx"),
+        provenance: prov(
+          `ICAO Annex 14 obstacle limitation surfaces (code 4 precision runway), LCLK runway 04/22 — indicative; Department of Civil Aviation consent required${worst ? `. Ground: DLS ${worst.src}` : ""}`,
+          "https://www.icao.int/safety/airnavigation/nationalitycodes/pages/annex14.aspx",
+        ),
       });
     }
     return hits;

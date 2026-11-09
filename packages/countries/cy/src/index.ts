@@ -4,7 +4,7 @@ import { dlsPlanningZones } from "./dls/zones.ts";
 import { cyPlotIdSchema } from "./plotId.ts";
 import { cyRuleLayers, cySourceLayer, cyUsesForZone } from "./rules.ts";
 import { cyRelaxationsFor } from "./relaxations.ts";
-import { cySiteContext } from "./site.ts";
+import { cySiteContextWithElevation } from "./site.ts";
 import { cyFinanceDefaults } from "./finance.ts";
 import { cyRestrictionLayers, larnacaNoiseFor } from "./restrictions.ts";
 import { larnacaStreetSearch } from "./larnaca/roads.ts";
@@ -29,7 +29,7 @@ export const cyprus: CountryModule = {
   usesForZone: cyUsesForZone,
   sourceLayerForZone: cySourceLayer,
   relaxationsFor: cyRelaxationsFor,
-  siteContext: async (_ctx, parcel) => cySiteContext(parcel),
+  siteContext: cySiteContextWithElevation,
   financeDefaults: cyFinanceDefaults,
   streetSearch: larnacaStreetSearch,
   coverage: [{ dist_abbr: "Κα4", planName: "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ", status: "curated" }],
@@ -51,7 +51,8 @@ export { parseRestParcels } from "./dls/parcels.ts";
 export * from "./plotId.ts";
 export * from "./rules.ts";
 export * from "./relaxations.ts";
-export { cySiteContext } from "./site.ts";
+export { cySiteContext, cySiteContextWithElevation, cyPlotElevation } from "./site.ts";
+export { groundElevation, readPixel, lzwDecode, dtmTilesAt } from "./dls/elevation.ts";
 export * from "./restrictions.ts";
 export { cyFinanceDefaults, officialLandValue } from "./finance.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";

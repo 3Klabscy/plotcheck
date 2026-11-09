@@ -245,4 +245,18 @@ export interface SiteContext {
   /** Country-specific tags used by rule selection (e.g. "cy.lca:axis"). */
   tags: string[];
   provenance: Provenance;
+  /** Ground elevation across the plot, metres above mean sea level. */
+  elevation?: SiteElevation;
+}
+
+export interface SiteElevation {
+  minM: number;
+  maxM: number;
+  meanM: number;
+  /** Number of points sampled on the plot. */
+  points: number;
+  /** e.g. "DTM 2019" */
+  source: string;
+  resolutionM: number;
+  provenance: Provenance;
 }

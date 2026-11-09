@@ -300,5 +300,7 @@ const en: Record<string, string> = {
   "search.matches_other": "{{count}} plots found — choose one (also shown on the map)",
   "search.matchLine": "Plot {{plot}} · sheet/plan {{sheet}} · block {{block}}",
   "map.orthoCredit": "Orthophoto {{date}} © DLS Cyprus",
+  "plot.elevation": "Ground elevation",
+  "plot.elevationSource": "DLS {{source}}",
 };
 export default en;

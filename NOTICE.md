@@ -18,6 +18,11 @@
 - Cadastral parcels, planning zones, orthophotos: **Department of Lands and Surveys,
   Republic of Cyprus** — INSPIRE services (eservices.dls.moi.gov.cy). Attribution is shown in
   the app. Confirm the terms of use for commercial redistribution (see TECHNICAL_PLAN §6).
+- Ground elevation: **DLS Digital Terrain Model** (INSPIRE Elevation; DTM 2019/2014 1 m tiles,
+  DTM 1993 5 m), **CC BY-SA 4.0** per the dataset metadata. Values are read on demand and not
+  redistributed; the tile index (`packages/countries/cy/data/cy-dtm-index.json`, built by
+  `tools/build_cy_dtm_index.py`) is derived from the DLS index and shared under CC BY-SA 4.0.
+  Attribution: "Ψηφιακό Μοντέλο Εδάφους © Τμήμα Κτηματολογίου και Χωρομετρίας, CC BY-SA 4.0".
 - Larnaca plan-street geometry (`packages/countries/cy/src/larnaca/streets.ts`): © OpenStreetMap
   contributors, ODbL 1.0 — the extract is shared under the same licence.
 - Larnaca road names (`packages/countries/cy/data/larnaca-roads-dls.json`): road geometry from the
