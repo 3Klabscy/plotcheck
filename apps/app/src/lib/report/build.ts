@@ -8,7 +8,7 @@ import type { OptionRow } from "../options";
 import type { AnalyseResponse, CountryConfig, ZonesResponse } from "../api";
 import type { FinanceSnapshot } from "../../components/Finance";
 import { fmtArea, fmtMoney, fmtNumber, fmtPercent } from "../format";
-import { contributionText, dedupeReview, headline, reasonText, relaxedHeadline } from "../text";
+import { contributionText, dedupeReview, headline, reasonText, relaxedHeadline, usedSummary } from "../text";
 import { C, ReportDoc, type Fonts } from "./doc";
 import { drawMapFigure } from "./map";
 
@@ -199,6 +199,8 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
   if (x) {
     doc.heading(t("relax.title"));
     doc.box(relaxedHeadline(t, lng, result) ?? "", { color: C.violet, fill: C.panel, size: 10 });
+    const used = usedSummary(t, lng, result);
+    if (used) doc.text(used, { size: 9, gapAfter: 4 });
     if (x.applied.length) doc.text(t("relax.applied"), { size: 9, bold: true, gapAfter: 1 });
     for (const a of x.applied) {
       doc.bullet(`${t(a.titleKey)} (${t(`tier.${a.tier}`)})`, { bold: true, markColor: C.violet });

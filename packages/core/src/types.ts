@@ -222,6 +222,9 @@ export interface Relaxation {
   notCombinableWith?: string[];
   /** Combined farPct of all relaxations in the same cap group may not exceed maxPct. */
   cap?: { group: string; maxPct: number };
+  /** When this relaxation is used, the combined farPct of the whole package may not exceed this
+   *  (e.g. a scheme that "combines with other incentives up to 35% in total"). */
+  packageMaxPct?: number;
   /** Applied to the figures (true) or listed as a note only (false). */
   quantified: boolean;
   validUntil?: string;

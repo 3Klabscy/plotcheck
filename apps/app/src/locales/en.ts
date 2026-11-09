@@ -416,5 +416,7 @@ const en: Record<string, string> = {
   "report.opt.relaxedNote": "With the available relaxations.",
   "report.comp.what": "Property",
   "report.comp.excluded": "left out",
+  "relax.used": "Used: {{list}}.",
+  "relax.usedTotal": "Used: {{list}} — +{{pct}}% building density in total.",
 };
 export default en;

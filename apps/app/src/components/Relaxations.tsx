@@ -2,7 +2,7 @@ import { Linking, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { AnalysisResult, AppliedRelaxation } from "@plotcheck/engine";
 import { fmtArea, fmtNumber } from "../lib/format";
-import { contributionText, relaxedHeadline } from "../lib/text";
+import { contributionText, relaxedHeadline, usedSummary } from "../lib/text";
 import { colors } from "../theme";
 import { Card, SectionTitle, styles } from "./ui";
 
@@ -64,6 +64,7 @@ export function RelaxationsView({ result }: { result: AnalysisResult }) {
     <Card style={{ borderColor: "#5B3FA8", borderWidth: 2 }}>
       <SectionTitle>{t("relax.title")}</SectionTitle>
       <Text style={[styles.body, { fontSize: 16, lineHeight: 23, fontWeight: "600" }]} testID="relaxed-headline">{headline}</Text>
+      {usedSummary(t, lng, result) && <Text style={[styles.small, { color: colors.ink, marginTop: 4 }]} testID="relaxed-used">{usedSummary(t, lng, result)}</Text>}
       <Text style={[styles.small, { marginTop: 6, marginBottom: 8 }]}>{t("relax.intro")}</Text>
 
       {x.applied.length > 0 && (

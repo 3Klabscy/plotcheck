@@ -78,3 +78,23 @@ export function dedupeReview(r: AnalysisResult) {
   }
   return [...groups].map(([source, cs]) => ({ source, constraints: [...cs] }));
 }
+
+/** One line naming every relaxation used in the figures, with its share of the density uplift. */
+export function usedSummary(t: TFunction, lng: string, result: AnalysisResult): string | undefined {
+  const x = result.relaxed;
+  if (!x || x.applied.length === 0) return undefined;
+  const baseFar = result.figures.far;
+  let totalPct = 0;
+  const parts = x.applied.map((a) => {
+    const add = a.contribution.farAdd ?? 0;
+    if (add > 0 && baseFar > 0) {
+      const pct = Math.round((add / baseFar) * 100);
+      totalPct += pct;
+      return `${t(a.titleKey)} (+${pct}%)`;
+    }
+    return t(a.titleKey);
+  });
+  return totalPct > 0
+    ? t("relax.usedTotal", { list: parts.join(", "), pct: fmtNumber(totalPct, lng) })
+    : t("relax.used", { list: parts.join(", ") });
+}

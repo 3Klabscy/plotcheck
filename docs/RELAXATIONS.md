@@ -28,9 +28,9 @@ Catalogue in `packages/countries/cy/src/relaxations.ts`. Researched 2026-11-09. 
 | `cy.o4-2026.upper-setbacks` | Reduced distances from the 4th floor up; balconies 1.50 m | Discretionary | note | §5.8, §5.2 — primary |
 | `cy.o4-2026.coverage` | Coverage adjustment cases | Discretionary | note | §3 — primary |
 | `cy.o4-2026.slope` | +1 floor on steep ground | Discretionary | note | §4.2 — primary |
-| `cy.o4-2025.res` | +5% density for energy performance / RES | Conditional | yes | Order 4/2025 (replaces 1/2020) — publication notices |
-| `cy.scheme.affordable-45` | Up to +45% density, part of the extra units affordable (KOAG) | Conditional, obligation | yes | Gov.cy; press 2025–26 — **status after 31/12/2025 to confirm** |
-| `cy.scheme.buyout-25` | ~+25% density for a payment into the Affordable Housing Fund | Conditional, cost | alternative | Secondary (Axia) |
+| `cy.o4-2025.res` | +5% density for energy performance / RES. Used together with the +25% scheme tier (up to 35% in total); not with the +45% tier | Conditional | yes | Order 4/2025 (replaces 1/2020) — publication notices |
+| `cy.scheme.affordable` | Affordable-housing scheme, tier by plot and density (ΚΟΑΓ table, Cabinet 16/4/2025): 500–799 m² & ΣΔ ≥ 1.20 → **+25%, combines with other incentives up to 35%**; 800–1,999 m² & ΣΔ ≥ 1.20 → +45%, no combination; ≥ 2,000 m² → +45% (ΣΔ ≥ 1.00, no combination) or +25% (ΣΔ < 1.00, up to 35%). Obligation (way 1): 10% (for +25%) / 20% (for +45%) of the permitted density sold to ΚΟΑΓ beneficiaries at €1,650/m² buildable | Conditional, obligation | yes | ΚΟΑΓ «Πολεοδομικά Κίνητρα» — primary table; no end date stated |
+| `cy.scheme.buyout` | Same tier, way 4: payment to the Affordable Housing Fund (incentive floor area × 1.5 × value of building density) | Conditional, cost | alternative | ΚΟΑΓ — primary |
 | `cy.scheme.recovery` | Buy extra density at 50% (70% outside designated areas) of its value | Conditional, cost | note | Cabinet proposal 15/12/2023 — primary |
 | `cy.scheme.family-floor` | Extra floor or unit for family, ~150/180 m², existing houses, to end of 2027 | Conditional | note | Press 09/2026 — scheme guide to check |
 | `cy.lca.unified-complex` / `social-complex` | +5% / +25% for 4+ normal plots; with RES max +30% | Conditional | note (needs merged plots) | Larnaca LP 2019 §12.8 — **primary** |
@@ -98,7 +98,8 @@ streets are not covered yet:
 
 ## To do
 
-- Confirm the affordable-housing scheme's current terms and whether it applies after 31/12/2025.
+- Affordable-housing scheme: tiers and the 35%/45% totals now follow the ΚΟΑΓ table (decision 16/4/2025). Still to read: the full decision text (cldc.org.cy ΠΑΡΑΡΤΗΜΑ13) for edge cases (net plot area, merged plots) and its validity.
+- Every relaxation used in the figures is listed in one line under the relaxations headline (screen and PDF), with its share of the density uplift.
 - Read Order 4/2025 itself, including its energy thresholds.
 - Add the incentive chapters of the other Local Plans (Nicosia, Limassol, Paphos, Famagusta)
   and of the Policy Statement.

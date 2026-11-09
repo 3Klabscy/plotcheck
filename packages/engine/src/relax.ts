@@ -81,6 +81,8 @@ export function bestDensityPackage(cands: Relaxation[], baseFar: number) {
       capSum.set(r.cap.group, c);
       if (c.sum > c.max + 1e-9) ok = false;
     }
+    const totalPct = set.reduce((sum, r) => sum + (r.effect.farPct ?? 0), 0);
+    if (set.some((r) => r.packageMaxPct !== undefined && totalPct > r.packageMaxPct + 1e-9)) ok = false;
     if (!ok) continue;
     let far = baseFar + set.reduce((s, r) => s + (r.effect.farPct ?? 0) * baseFar + (r.effect.farAdd ?? 0), 0);
     const ceiling = Math.min(...set.map((r) => r.effect.maxFar ?? Infinity));

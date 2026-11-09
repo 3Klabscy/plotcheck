@@ -162,42 +162,64 @@ const res5: Relaxation = {
   ),
 };
 
-const affordable45: Relaxation = {
-  id: "cy.scheme.affordable-45",
-  tier: "conditional",
-  titleKey: "cy.relax.affordable.title",
-  grantKey: "cy.relax.affordable.grant",
-  conditionsKey: "cy.relax.affordable.conditions",
-  instrument: "Σχέδιο Παροχής Πολεοδομικών Κινήτρων (Αποφάσεις Υπουργικού Συμβουλίου, αναθεώρηση 2025)",
-  effect: { farPct: 0.45 },
-  cost: { type: "affordable_units", pctOfExtraUnits: 0.25, noteKey: "cy.relax.affordable.cost" },
-  uses: MULTI_UNIT,
-  exclusiveGroup: "cy.national-scheme",
-  notCombinableWith: ["cy.o4-2025.res", "cy.lca.*"],
-  quantified: true,
-  statusNoteKey: "cy.relax.affordable.status",
-  provenance: src(
-    "Gov.cy announcement on the planning incentives scheme; press reports 2025–2026",
-    "https://www.gov.cy/esoterika-themata/epekteinetai-i-ischys-tou-schediou-parochis-poleodomikon-kinitron-gia-anakampsi-tis-epicheirimatikis-drastiriotitas-stin-kypro/",
-  ),
-};
+/**
+ * Σχέδιο Παροχής Πολεοδομικών Κινήτρων (affordable housing), Cabinet decision 16/4/2025, as tabled by
+ * ΚΟΑΓ (cldc.org.cy, "Πολεοδομικά Κίνητρα", read 2026-11-09). Plot in a zone where housing is allowed:
+ *   500–799 m²,  ΣΔ ≥ 1,20 → +25%, combines with other incentives up to 35% in total
+ *   800–1.999 m², ΣΔ ≥ 1,20 → +45%, no combination (45% in total)
+ *   ≥ 2.000 m²,  ΣΔ ≥ 1,00 → +45%, no combination
+ *   ≥ 2.000 m²,  ΣΔ < 1,00 → +25%, combines up to 35%
+ * Not in traditional cores, ΠΕΧ, Antiquities-controlled areas, listed buildings or next to them.
+ * Ways: affordable units on site (20% of the permitted ΣΔ for +45%, 10% for +25%, sold to ΚΟΑΓ
+ * beneficiaries at €1.650/m² buildable from 1/7/2024), elsewhere, for rent (+45%), or buy-out (way 4).
+ */
+export function nationalSchemeTier(plotAreaM2: number | undefined, baseFar: number | undefined): { pct: 0.25 | 0.45; combinable: boolean; totalMax: number } | undefined {
+  if (plotAreaM2 === undefined || baseFar === undefined || plotAreaM2 < 500) return undefined;
+  if (plotAreaM2 < 800) return baseFar >= 1.2 - 1e-9 ? { pct: 0.25, combinable: true, totalMax: 0.35 } : undefined;
+  if (plotAreaM2 < 2000) return baseFar >= 1.2 - 1e-9 ? { pct: 0.45, combinable: false, totalMax: 0.45 } : undefined;
+  return baseFar >= 1 - 1e-9 ? { pct: 0.45, combinable: false, totalMax: 0.45 } : { pct: 0.25, combinable: true, totalMax: 0.35 };
+}
 
-const buyout25: Relaxation = {
-  id: "cy.scheme.buyout-25",
-  tier: "conditional",
-  titleKey: "cy.relax.buyout.title",
-  grantKey: "cy.relax.buyout.grant",
-  conditionsKey: "cy.relax.buyout.conditions",
-  instrument: "Σχέδιο Παροχής Πολεοδομικών Κινήτρων — εξαγορά (αναθεώρηση 2025)",
-  effect: { farPct: 0.25 },
-  cost: { type: "compensation", noteKey: "cy.relax.buyout.cost" },
-  uses: MULTI_UNIT,
-  exclusiveGroup: "cy.national-scheme",
-  notCombinableWith: ["cy.o4-2025.res", "cy.lca.*"],
-  quantified: true,
-  statusNoteKey: "cy.relax.affordable.status",
-  provenance: src("Larnaca incentives guide (Axia Valuers, 28/5/2026) — secondary source", "https://www.axiavaluers.com/en/news/36"),
-};
+const KOAG = src("ΚΟΑΓ — Πολεοδομικά Κίνητρα (Απόφαση Υπουργικού Συμβουλίου 16/4/2025), πίνακας επιλεξιμότητας", "https://cldc.org.cy/en/utilization-of-urban-planning-incentive/urban-incentives/");
+
+function schemeRelaxations(tier: NonNullable<ReturnType<typeof nationalSchemeTier>>): Relaxation[] {
+  const pct = Math.round(tier.pct * 100);
+  const combine: Partial<Relaxation> = tier.combinable ? { packageMaxPct: tier.totalMax } : { notCombinableWith: ["cy.o4-2025.res", "cy.lca.*"] };
+  return [
+    {
+      id: "cy.scheme.affordable",
+      tier: "conditional",
+      titleKey: "cy.relax.affordable.title",
+      grantKey: tier.combinable ? "cy.relax.affordable.grant25" : "cy.relax.affordable.grant45",
+      conditionsKey: "cy.relax.affordable.conditions",
+      instrument: `Σχέδιο Παροχής Πολεοδομικών Κινήτρων (Απόφαση Υπουργικού Συμβουλίου 16/4/2025) — +${pct}%`,
+      effect: { farPct: tier.pct },
+      cost: { type: "affordable_units", pctOfExtraUnits: tier.pct === 0.45 ? 0.2 / 0.45 : 0.1 / 0.25, noteKey: tier.combinable ? "cy.relax.affordable.cost25" : "cy.relax.affordable.cost45" },
+      uses: MULTI_UNIT,
+      exclusiveGroup: "cy.national-scheme",
+      ...combine,
+      quantified: true,
+      statusNoteKey: "cy.relax.affordable.status",
+      provenance: KOAG,
+    },
+    {
+      id: "cy.scheme.buyout",
+      tier: "conditional",
+      titleKey: "cy.relax.buyout.title",
+      grantKey: tier.combinable ? "cy.relax.buyout.grant25" : "cy.relax.buyout.grant45",
+      conditionsKey: "cy.relax.buyout.conditions",
+      instrument: `Σχέδιο Παροχής Πολεοδομικών Κινήτρων — Τρόπος 4, χρηματικό αντιστάθμισμα — +${pct}%`,
+      effect: { farPct: tier.pct },
+      cost: { type: "compensation", noteKey: "cy.relax.buyout.cost" },
+      uses: MULTI_UNIT,
+      exclusiveGroup: "cy.national-scheme",
+      ...combine,
+      quantified: true,
+      statusNoteKey: "cy.relax.affordable.status",
+      provenance: KOAG,
+    },
+  ];
+}
 
 const recovery: Relaxation = {
   id: "cy.scheme.recovery",
@@ -394,7 +416,9 @@ export function cyRelaxationsFor(zone: ZoneHit, ctx: CyRelaxationContext | numbe
   const commercial = first(zone) === "Ε";
   const tourist = first(zone) === "Τ";
   const agricultural = first(zone) === "Γ" || first(zone) === "Ζ";
-  if (!agricultural) out.push(affordable45, buyout25);
+  // national affordable-housing scheme: tier by plot area and the zone's density (ΚΟΑΓ table)
+  const tier = !agricultural && !isCoreOrHistoric(zone) ? nationalSchemeTier(parcel?.officialAreaM2, baseFar) : undefined;
+  if (tier) out.push(...schemeRelaxations(tier));
 
   if (!isLarnacaLP(zone)) {
     if (!agricultural) out.push(res5);

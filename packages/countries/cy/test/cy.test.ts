@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { resolveRules } from "@plotcheck/core";
-import { analyse } from "@plotcheck/engine";
+import { analyse, bestDensityPackage } from "@plotcheck/engine";
 import type { ProviderContext } from "@plotcheck/country-sdk";
 import {
   cyprus,
@@ -16,6 +16,7 @@ import {
   cySourceLayer,
   toZoneHit,
   cyRelaxationsFor,
+  nationalSchemeTier,
   larnacaStreetFrontage,
   parseRestParcels,
   cySiteContext,
@@ -181,7 +182,7 @@ describe("Cyprus relaxations catalogue", () => {
 
   it("applies island-wide relaxations everywhere, each with an instrument and source", () => {
     const list = cyRelaxationsFor(hit("Κα4", "ΠΕΡΙΟΧΕΣ ΜΕ ΕΠΙΚΡΑΤΟΥΣΑ ΧΡΗΣΗ ΤΗΝ ΚΑΤΟΙΚΙΑ", "999", "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΕΜΕΣΟΥ"), 1.2);
-    for (const id of ["cy.o4-2026.verandas", "cy.o4-2026.basement", "cy.o4-2026.extra-floors", "cy.o4-2025.res", "cy.scheme.affordable-45"]) expect(list.map((r) => r.id)).toContain(id);
+    for (const id of ["cy.o4-2026.verandas", "cy.o4-2026.basement", "cy.o4-2026.extra-floors", "cy.o4-2025.res"]) expect(list.map((r) => r.id)).toContain(id);
     for (const r of list) {
       expect(r.instrument.length).toBeGreaterThan(3);
       expect(r.provenance.sourceRef).toMatch(/^https:\/\//);
@@ -225,8 +226,28 @@ describe("Cyprus relaxations catalogue", () => {
     const r = cyRelaxationsFor(hit("Η2", "", "x", "ΔΗΛΩΣΗ ΠΟΛΙΤΙΚΗΣ ΓΙΑ ΤΗΝ ΥΠΑΙΘΡΟ")).find((x) => x.id === "cy.o4-2026.extra-floors");
     expect(r?.effect.floorsAdd).toBe(1);
   });
+  it("tiers the affordable-housing scheme by plot area and density (ΚΟΑΓ table, 16/4/2025)", () => {
+    expect(nationalSchemeTier(450, 1.2)).toBeUndefined();
+    expect(nationalSchemeTier(698, 1.2)).toEqual({ pct: 0.25, combinable: true, totalMax: 0.35 });
+    expect(nationalSchemeTier(698, 1.0)).toBeUndefined();
+    expect(nationalSchemeTier(1000, 1.2)).toEqual({ pct: 0.45, combinable: false, totalMax: 0.45 });
+    expect(nationalSchemeTier(2500, 1.0)).toEqual({ pct: 0.45, combinable: false, totalMax: 0.45 });
+    expect(nationalSchemeTier(2500, 0.6)).toEqual({ pct: 0.25, combinable: true, totalMax: 0.35 });
+  });
+  it("uses the RES +5% together with the 25% tier, but not with the 45% tier", () => {
+    const sized = (area: number) => ({ officialAreaM2: area, geometry: { type: "Polygon", coordinates: [[[33.6, 34.9], [33.6001, 34.9], [33.6001, 34.9001], [33.6, 34.9]]] }, identifiers: {} }) as never;
+    const pkg = (area: number) => {
+      const cands = cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ"), { baseFar: 1.2, parcel: sized(area) }).filter((r) => r.quantified && (r.effect.farPct || r.effect.farAdd) && (!r.uses || r.uses.includes("apartment_block")));
+      return bestDensityPackage(cands, 1.2).best.set;
+    };
+    const small = pkg(698);
+    expect(small.map((r) => r.id)).toEqual(expect.arrayContaining(["cy.scheme.affordable", "cy.o4-2025.res"]));
+    expect(small.reduce((a, r) => a + (r.effect.farPct ?? 0), 0)).toBeLessThanOrEqual(0.35 + 1e-9); // 25% + RES 5% + listed transfer 5%
+    expect(pkg(1000).map((r) => r.id)).toEqual(["cy.scheme.affordable"]);
+  });
   it("every relaxation has el and en texts", () => {
-    const all = [...cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ")), ...cyRelaxationsFor(hit("Εβ", "ΕΜΠΟΡΙΚΗ")), ...cyRelaxationsFor(hit("Πα5", "ΣΥΝΕΧΟΥΣ ΔΟΜΗΣΗΣ")), ...cyRelaxationsFor(hit("Η2", "", "x", "ΔΗΛΩΣΗ ΠΟΛΙΤΙΚΗΣ"))];
+    const sized = (area: number) => ({ officialAreaM2: area, geometry: { type: "Polygon", coordinates: [[[33.6, 34.9], [33.6001, 34.9], [33.6001, 34.9001], [33.6, 34.9]]] }, identifiers: {} }) as never;
+    const all = [...cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ"), { baseFar: 1.2, parcel: sized(698) }), ...cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ"), { baseFar: 1.2, parcel: sized(1200) }), ...cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ")), ...cyRelaxationsFor(hit("Εβ", "ΕΜΠΟΡΙΚΗ")), ...cyRelaxationsFor(hit("Πα5", "ΣΥΝΕΧΟΥΣ ΔΟΜΗΣΗΣ")), ...cyRelaxationsFor(hit("Η2", "", "x", "ΔΗΛΩΣΗ ΠΟΛΙΤΙΚΗΣ"))];
     for (const r of all) for (const lng of ["el", "en"]) for (const k of [r.titleKey, r.grantKey, r.conditionsKey, r.cost?.noteKey, r.statusNoteKey].filter(Boolean) as string[]) {
       expect(cyprus.messages[lng]![k], `${lng}:${k}`).toBeTruthy();
     }

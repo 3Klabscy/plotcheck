@@ -416,5 +416,7 @@ const el: Record<string, string> = {
   "report.opt.relaxedNote": "Με τις διαθέσιμες χαλαρώσεις.",
   "report.comp.what": "Ακίνητο",
   "report.comp.excluded": "εξαιρέθηκε",
+  "relax.used": "Χρησιμοποιούνται: {{list}}.",
+  "relax.usedTotal": "Χρησιμοποιούνται: {{list}} — σύνολο +{{pct}}% συντελεστή δόμησης.",
 };
 export default el;
