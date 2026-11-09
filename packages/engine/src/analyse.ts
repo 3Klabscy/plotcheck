@@ -7,6 +7,7 @@ import buffer from "@turf/buffer";
 import type { Feature, MultiPolygon, Polygon } from "geojson";
 import { maxOf, minOf, type ConstraintName, type ZoneRuleSet } from "@plotcheck/core";
 import type { AnalysisInput, AnalysisResult, Check, CheckStatus, Figures, ReviewWarning, UnitMix } from "./types.ts";
+import { applyRelaxations } from "./relax.ts";
 
 export const ENGINE_VERSION = "0.1.0";
 
@@ -268,6 +269,13 @@ export function analyse(input: AnalysisInput): AnalysisResult {
   };
   if (!rules.curated) checks.push({ id: "zone_not_curated", status: "maybe", reasonKey: "reason.zone_not_curated", params: { zone: rules.dist_abbr } });
   result.status = worst(checks.map((c) => c.status));
+  if (input.relaxations?.length && result.status !== "not_allowed") {
+    const relaxed = applyRelaxations(input, result, input.relaxations, analyse);
+    if (relaxed) {
+      result.relaxed = relaxed;
+      toBeChecked.add("check.engineer.relaxations");
+    }
+  }
   result.toBeChecked = [...toBeChecked];
   return result;
 }

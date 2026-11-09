@@ -1,4 +1,5 @@
-import type { ConstraintName, PolygonGeometry, Provenance, UseType, ZoneRuleSet } from "@plotcheck/core";
+import type { ConstraintName, PolygonGeometry, Provenance, Relaxation, UseType, ZoneRuleSet } from "@plotcheck/core";
+import type { RelaxedScenario } from "./relax.ts";
 
 export type CheckStatus = "allowed" | "not_allowed" | "maybe";
 
@@ -45,6 +46,8 @@ export interface AnalysisInput {
   rules: ZoneRuleSet;
   use: UseType;
   params: AnalysisParams;
+  /** Relaxations/incentives that apply to this plot (chosen by the country module). */
+  relaxations?: Relaxation[];
 }
 
 export interface Figures {
@@ -95,4 +98,6 @@ export interface AnalysisResult {
   needsReview: ReviewWarning[];
   /** i18n keys for the "to be checked by an engineer" list. */
   toBeChecked: string[];
+  /** Same plot with every available relaxation used, each one cited (only when relaxations were given). */
+  relaxed?: RelaxedScenario;
 }

@@ -15,6 +15,7 @@ import {
   formatNationalRef,
   cySourceLayer,
   toZoneHit,
+  cyRelaxationsFor,
 } from "../src/index.ts";
 
 const fx = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -163,5 +164,40 @@ describe("continuous-building zones", () => {
     expect(r.figures.setbackM).toBe(3);
     expect(r.checks.find((c) => c.id === "setback_ambiguous")).toMatchObject({ status: "maybe", params: { min: 0, used: 3 } });
     expect(r.toBeChecked).toContain("check.engineer.setbacks");
+  });
+});
+
+describe("Cyprus relaxations catalogue", () => {
+  const hit = (zoneCode: string, description: string, planRef = "401", planName = "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ") =>
+    toZoneHit({ zoneCode, description, planRef, planName, density: 1.2, coverage: 0.5, stories: 3, heightM: 13.5 }, { identifiers: { municipalityCode: "4000" } } as never, 1, "x");
+  const ids = (z: ReturnType<typeof hit>) => cyRelaxationsFor(z, 1.2).map((r) => r.id);
+
+  it("applies island-wide relaxations everywhere, each with an instrument and source", () => {
+    const list = cyRelaxationsFor(hit("Κα4", "ΠΕΡΙΟΧΕΣ ΜΕ ΕΠΙΚΡΑΤΟΥΣΑ ΧΡΗΣΗ ΤΗΝ ΚΑΤΟΙΚΙΑ", "999", "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΕΜΕΣΟΥ"), 1.2);
+    for (const id of ["cy.o4-2026.verandas", "cy.o4-2026.basement", "cy.o4-2026.extra-floors", "cy.o4-2025.res", "cy.scheme.affordable-45"]) expect(list.map((r) => r.id)).toContain(id);
+    for (const r of list) {
+      expect(r.instrument.length).toBeGreaterThan(3);
+      expect(r.provenance.sourceRef).toMatch(/^https:\/\//);
+      expect(r.provenance.status).toBe("needs_review");
+    }
+    expect(list.some((r) => r.id.startsWith("cy.lca."))).toBe(false);
+  });
+  it("adds Larnaca Local Plan incentives only on plan 401", () => {
+    expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ"))).toContain("cy.lca.listed-transfer");
+    expect(ids(hit("Εβ", "ΕΜΠΟΡΙΚΗ"))).toEqual(expect.arrayContaining(["cy.lca.urban-kep", "cy.lca.urban-axis"]));
+  });
+  it("offers 0 m side distances only in continuous-building zones", () => {
+    expect(ids(hit("Πα5", "ΠΕΡΙΟΧΕΣ ΠΥΡΗΝΩΝ ΚΑΙ ΣΥΝΕΧΟΥΣ ΔΟΜΗΣΗΣ"))).toContain("cy.o4-2026.continuous");
+    expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ"))).not.toContain("cy.o4-2026.continuous");
+  });
+  it("limits discretionary extra floors to 1 under the Policy Statement", () => {
+    const r = cyRelaxationsFor(hit("Η2", "", "x", "ΔΗΛΩΣΗ ΠΟΛΙΤΙΚΗΣ ΓΙΑ ΤΗΝ ΥΠΑΙΘΡΟ")).find((x) => x.id === "cy.o4-2026.extra-floors");
+    expect(r?.effect.floorsAdd).toBe(1);
+  });
+  it("every relaxation has el and en texts", () => {
+    const all = [...cyRelaxationsFor(hit("Κα4", "ΚΑΤΟΙΚΙΑ")), ...cyRelaxationsFor(hit("Εβ", "ΕΜΠΟΡΙΚΗ")), ...cyRelaxationsFor(hit("Πα5", "ΣΥΝΕΧΟΥΣ ΔΟΜΗΣΗΣ")), ...cyRelaxationsFor(hit("Η2", "", "x", "ΔΗΛΩΣΗ ΠΟΛΙΤΙΚΗΣ"))];
+    for (const r of all) for (const lng of ["el", "en"]) for (const k of [r.titleKey, r.grantKey, r.conditionsKey, r.cost?.noteKey, r.statusNoteKey].filter(Boolean) as string[]) {
+      expect(cyprus.messages[lng]![k], `${lng}:${k}`).toBeTruthy();
+    }
   });
 });

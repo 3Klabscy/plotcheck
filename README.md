@@ -25,6 +25,10 @@ be built on it. Web only in phase 1, built on the multi-country architecture fro
 
   Every check returns allowed / not allowed / maybe with a reason. "Show me all options"
   compares all five building types.
+- **Relaxations (χαλαρώσεις) across Cyprus.** Every result also shows the plot with all
+  available relaxations and incentives applied: Order 4/2026, the RES bonus, the affordable-
+  housing scheme, and Larnaca Local Plan incentives. Each is cited with its rule, conditions and
+  cost. See [`docs/RELAXATIONS.md`](docs/RELAXATIONS.md).
 - **Trust.** Every unverified value is listed under a warning, together with its source. Every
   result shows the "to be checked by an engineer" list and the disclaimer.
 - **Greek and English** throughout, with local number formats.

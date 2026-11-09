@@ -147,3 +147,74 @@ export type RuleLayer = {
   /** path = jurisdiction prefix; plan = plan reference (a zone code can repeat across plans). */
   match: { path?: string[]; plan?: string; dist_abbr?: string; dist_prefix?: string };
 } & Partial<Omit<ZoneRuleSet, "schema" | "jurisdiction" | "dist_abbr">>;
+
+// ---------- Relaxations / planning incentives (country-agnostic model) ----------
+
+/**
+ * How firm a relaxation is:
+ *  - entitlement: applies as of right when its conditions are met (e.g. verandas not counted)
+ *  - conditional: granted on application if conditions/obligations are met (e.g. +5% for RES)
+ *  - discretionary: the planning authority MAY grant it (e.g. extra floors); never assumed silently
+ */
+export type RelaxationTier = "entitlement" | "conditional" | "discretionary";
+
+export interface RelaxationEffect {
+  /** Density uplift as a share of the zone's base density (0.05 = +5 %). */
+  farPct?: number;
+  /** Absolute density uplift (0.25 = +0.25:1). */
+  farAdd?: number;
+  /** Extra floors over the zone maximum. */
+  floorsAdd?: number;
+  /** Extra permitted height per floor (m), e.g. offices +0.70 m. */
+  heightPerFloorM?: number;
+  /** Covered verandas/balconies not counted in density, as a share of each floor's built area. */
+  excludedVerandaPct?: number;
+  /** Basement for parking/storage/plant not counted in density. */
+  basementExcluded?: boolean;
+  /** Side/rear boundary distance that may apply instead of the default (m). */
+  setbackM?: number;
+  /** Coverage the scheme imposes when used (fraction). */
+  coverageMax?: number;
+  /** Absolute floor cap the scheme imposes when used. */
+  maxFloors?: number;
+  /** Absolute density ceiling the scheme imposes. */
+  maxFar?: number;
+}
+
+export interface RelaxationCost {
+  type: "none" | "compensation" | "affordable_units" | "transfer" | "other";
+  /** compensation: share of the value of the extra floor area (at the official valuation). */
+  pctOfExcessValue?: number;
+  /** affordable_units: share of the EXTRA units to be made available as affordable housing. */
+  pctOfExtraUnits?: number;
+  noteKey?: string;
+}
+
+export interface Relaxation {
+  id: string;
+  tier: RelaxationTier;
+  /** i18n keys (country module messages): title, what it grants, conditions. */
+  titleKey: string;
+  grantKey: string;
+  conditionsKey: string;
+  /** Legal instrument, e.g. "Εντολή 4/2026 §2.2.15". */
+  instrument: string;
+  effect: RelaxationEffect;
+  cost?: RelaxationCost;
+  /** Uses it applies to; undefined = all. */
+  uses?: UseType[];
+  minPlotAreaM2?: number;
+  maxPlotAreaM2?: number;
+  /** Only one relaxation per exclusive group can be used (e.g. national schemes: one per property). */
+  exclusiveGroup?: string;
+  /** Ids (or id prefixes ending in "*") this relaxation must not be combined with. */
+  notCombinableWith?: string[];
+  /** Combined farPct of all relaxations in the same cap group may not exceed maxPct. */
+  cap?: { group: string; maxPct: number };
+  /** Applied to the figures (true) or listed as a note only (false). */
+  quantified: boolean;
+  validUntil?: string;
+  /** Shown when validity/terms could not be confirmed from a primary source. */
+  statusNoteKey?: string;
+  provenance: Provenance;
+}

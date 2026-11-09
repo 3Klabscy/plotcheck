@@ -7,6 +7,7 @@ import type { AnalyseResponse } from "../lib/api";
 import { fmtArea, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, StatusBadge, styles } from "./ui";
+import { RelaxationsView } from "./Relaxations";
 
 /** Translate engine reason params: use keys → names, numbers → local format. */
 export function reasonText(t: TFunction, lng: string, c: Pick<Check, "reasonKey" | "params">): string {
@@ -94,6 +95,8 @@ export function ResultView({ data, result }: { data: AnalyseResponse; result: An
         </View>
         <Text style={[styles.body, { fontSize: 16, lineHeight: 24 }]} testID="headline">{headline(t, lng, result)}</Text>
       </Card>
+
+      <RelaxationsView result={result} />
 
       {review.length > 0 && (
         <Notice>

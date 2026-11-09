@@ -191,12 +191,14 @@ export function createApi(deps: ApiDeps) {
       if (!z.primary) throw new HttpError(422, "no_zone", "No planning zone found for this plot");
       const params = mergeParams(defaultParams(country), b["params"]);
       const site = { geometry: parcel.geometry, officialAreaM2: parcel.officialAreaM2 };
+      const baseFar = z.primary.rules.constraints.far?.max_val?.[0]?.expression;
+      const relaxations = country.relaxationsFor?.(z.primary.zone, typeof baseFar === "number" ? baseFar : undefined) ?? [];
       const useRaw = b["use"];
       let results: AnalysisResult[];
-      if (useRaw === "all") results = compareScenarios({ site, rules: z.primary.rules, params });
+      if (useRaw === "all") results = compareScenarios({ site, rules: z.primary.rules, params, relaxations });
       else {
         if (!USE_TYPES.includes(useRaw as UseType)) throw new HttpError(400, "invalid_use");
-        results = [analyse({ site, rules: z.primary.rules, use: useRaw as UseType, params })];
+        results = [analyse({ site, rules: z.primary.rules, use: useRaw as UseType, params, relaxations })];
       }
       return {
         parcel,
