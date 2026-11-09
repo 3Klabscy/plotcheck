@@ -130,6 +130,7 @@ const en: Record<string, string> = {
   "reason.setback_footprint": "After {{setback}} m from the boundaries, {{footprint}} m² of the plot can be built on.",
   "reason.setback_no_footprint": "After {{setback}} m from the boundaries no buildable area is left.",
   "reason.setback_ambiguous": "Boundary distances could be as low as {{min}} m here (e.g. continuous building); {{used}} m was used to stay on the safe side.",
+  "reason.stepped_setbacks": "From floor {{floor}} the building must be {{setback}} m from the boundaries (up to {{top}} m), so upper floors are smaller.",
   "reason.setback_unknown": "Boundary distances for this zone are not known.",
   "reason.setback_no_geometry": "The plot shape is not available, so boundary distances were not checked.",
   "reason.front_setback": "A front setback of {{setback}} m applies on the road side.",
@@ -178,5 +179,9 @@ const en: Record<string, string> = {
   "contrib.basement": "basement of up to about {{area}} per level not counted in density",
   "contrib.setback": "boundary distance {{m}} m instead of the default",
   "check.engineer.relaxations": "Eligibility, conditions and costs of each relaxation used",
+  "reason.unit_size_ok": "Dwelling sizes meet the plan's minimum usable areas.",
+  "reason.unit_size_small": "The assumed {{type}} size ({{size}} m²) is below the plan minimum of {{min}} m² usable area.",
+  "reason.studio_share": "Studios may not exceed {{share}}% of the units in developments of 5 or more units.",
+  "constraint.unit_size": "Minimum dwelling sizes",
 };
 export default en;

@@ -124,3 +124,24 @@ describe("helpers", () => {
     expect(out.at(-1)?.use).toBe("commercial");
   });
 });
+
+describe("stepped setbacks", () => {
+  it("gives upper floors a smaller plate when distances step back with height", () => {
+    const lat = 34.92, lng = 33.62, d = 30 / 111_320, e = 30 / (111_320 * Math.cos((lat * Math.PI) / 180));
+    const geometry = { type: "Polygon" as const, coordinates: [[[lng, lat], [lng + e, lat], [lng + e, lat + d], [lng, lat + d], [lng, lat]]] }; // 30 × 30
+    const rs = rules();
+    rs.constraints.far = constant("max", 2.4, P);
+    rs.constraints.lot_cov_bldg = constant("max", 0.6, P);
+    rs.constraints.stories = constant("max", 5, P);
+    rs.constraints.setback_dist_boundary = { min_val: [{ condition: "floor <= 3", expression: 3 }, { condition: "floor == 4", expression: 4 }, { condition: true, expression: 5 }], provenance: P };
+    const r = analyse({ site: { geometry }, rules: rs, use: "apartment_block", params });
+    const [g, f1, f2, f3, f4] = r.figures.perFloorM2;
+    expect(g).toBeCloseTo(540, -1); // coverage 0.6 × 900 < 24×24 = 576
+    expect(f1).toBe(g);
+    expect(f2).toBe(g);
+    expect(f3!).toBeCloseTo(484, -1); // 22 × 22
+    expect(f4!).toBeLessThan(f3!); // 20 × 20 = 400 (or the rest of the density)
+    expect(r.figures.setbackByFloorM).toEqual([3, 3, 3, 4, 5]);
+    expect(r.checks.find((c) => c.id === "stepped_setbacks")?.params).toMatchObject({ floor: 4, setback: 4, top: 5 });
+  });
+});

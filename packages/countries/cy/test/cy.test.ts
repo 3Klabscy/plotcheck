@@ -16,6 +16,8 @@ import {
   cySourceLayer,
   toZoneHit,
   cyRelaxationsFor,
+  larnacaStreetFrontage,
+  parseRestParcels,
 } from "../src/index.ts";
 
 const fx = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -183,9 +185,33 @@ describe("Cyprus relaxations catalogue", () => {
     expect(list.some((r) => r.id.startsWith("cy.lca."))).toBe(false);
   });
   it("adds Larnaca Local Plan incentives only on plan 401", () => {
-    expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ"))).toContain("cy.lca.listed-transfer");
-    expect(ids(hit("Εβ", "ΕΜΠΟΡΙΚΗ"))).toEqual(expect.arrayContaining(["cy.lca.urban-kep", "cy.lca.urban-axis"]));
+    expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ"))).toEqual(expect.arrayContaining(["cy.lca.listed-transfer", "cy.lca.unified-complex"]));
+    expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ", "999", "ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΕΜΕΣΟΥ")).some((x) => x.startsWith("cy.lca."))).toBe(false);
   });
+
+  const parcelFrom = (file: string, ref: string) => {
+    const raw = parseRestParcels(fx(file)).find((r) => r.nationalRef === ref)!;
+    return { geometry: raw.geometry, officialAreaM2: raw.areaM2, nationalRef: ref } as never;
+  };
+
+  it("detects frontage on a commercial axis and offers the §11.6.3 bonus (Makariou III)", () => {
+    const parcel = parcelFrom("rest-makariou.geojson", "4000-41/490403-2-4-905");
+    expect(larnacaStreetFrontage(parcel)[0]).toMatchObject({ id: "makariou", group: "axis" });
+    const list = cyRelaxationsFor(hit("Εβ", "ΕΜΠΟΡΙΚΗ"), { baseFar: 1.4, parcel }).map((r) => r.id);
+    expect(list).toEqual(expect.arrayContaining(["cy.lca.urban-axis-30", "cy.lca.urban-axis-50", "cy.lca.uc-housing-mix"]));
+    expect(list).not.toContain("cy.lca.urban-kep");
+  });
+
+  it("detects Central Commercial Area streets (Ermou)", () => {
+    const parcel = parcelFrom("rest-ermou.geojson", "4000-41/570103-1-4-545");
+    expect(larnacaStreetFrontage(parcel).map((f) => f.group)).toContain("kep");
+    expect(cyRelaxationsFor(hit("Εβ", "ΕΜΠΟΡΙΚΗ"), { baseFar: 2, parcel }).map((r) => r.id)).toContain("cy.lca.urban-kep");
+  });
+
+  it("finds no plan-street frontage for a residential plot away from the centre", () => {
+    expect(larnacaStreetFrontage(parcelFrom("rest-query-bbox.geojson", "4000-40/56W1-3-1-666"))).toEqual([]);
+  });
+
   it("offers 0 m side distances only in continuous-building zones", () => {
     expect(ids(hit("Πα5", "ΠΕΡΙΟΧΕΣ ΠΥΡΗΝΩΝ ΚΑΙ ΣΥΝΕΧΟΥΣ ΔΟΜΗΣΗΣ"))).toContain("cy.o4-2026.continuous");
     expect(ids(hit("Κα4", "ΚΑΤΟΙΚΙΑ"))).not.toContain("cy.o4-2026.continuous");

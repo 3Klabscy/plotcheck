@@ -126,16 +126,20 @@ export function applyRelaxations(input: AnalysisInput, base: AnalysisResult, rel
   const far = baseFar + best.add;
   let floorsAdd = 0;
   let coverage = baseCov;
-  let maxFloorsCap = Infinity;
+  let floorsTo = 0; // scheme grants floors "up to N"
   for (const r of best.set) {
     const add = (r.effect.farPct ?? 0) * baseFar + (r.effect.farAdd ?? 0);
-    applied.push(toApplied(r, { farAdd: round(add, 3), gfaM2: round(add * plotArea, 0) }));
+    const schemeFloors = r.effect.floorsAdd ?? (r.effect.maxFloors !== undefined && baseStories !== undefined ? Math.max(0, r.effect.maxFloors - baseStories) : undefined);
+    applied.push(toApplied(r, { farAdd: round(add, 3), gfaM2: round(add * plotArea, 0), ...(schemeFloors ? { floorsAdd: schemeFloors, heightAddM: round(schemeFloors * st, 1) } : {}) }));
     usedIds.add(r.id);
     if (r.effect.floorsAdd) floorsAdd = Math.max(floorsAdd, r.effect.floorsAdd);
     if (r.effect.coverageMax !== undefined && coverage !== undefined) coverage = Math.min(coverage, r.effect.coverageMax);
-    if (r.effect.maxFloors !== undefined) maxFloorsCap = Math.min(maxFloorsCap, r.effect.maxFloors);
+    if (r.effect.maxFloors !== undefined) floorsTo = Math.max(floorsTo, r.effect.maxFloors);
   }
   if (far !== baseFar) withMax(rules, "far", far, relaxProv);
+  for (const r of best.set) {
+    if (r.effect.setbackRule) rules.constraints.setback_dist_boundary = { min_val: r.effect.setbackRule, provenance: r.provenance } as Constraint;
+  }
   if (coverage !== undefined && coverage !== baseCov) withMax(rules, "lot_cov_bldg", coverage, relaxProv);
 
   // 2. Setbacks (e.g. continuous building)
@@ -157,20 +161,30 @@ export function applyRelaxations(input: AnalysisInput, base: AnalysisResult, rel
 
   // 4. Floors: scheme floors first; then discretionary extra floors only if needed to build the density
   const recompute = () => {
-    const stories = baseStories !== undefined ? Math.min(baseStories + floorsAdd, maxFloorsCap) : undefined;
+    const stories = baseStories !== undefined ? Math.max(baseStories + floorsAdd, floorsTo) : floorsTo || undefined;
     if (stories !== undefined) withMax(rules, "stories", stories, relaxProv);
-    if (baseHeight !== undefined) withMax(rules, "height", baseHeight + floorsAdd * st + heightPerFloorAdd * (stories ?? 0), relaxProv);
+    const extraFloors = stories !== undefined && baseStories !== undefined ? stories - baseStories : floorsAdd;
+    if (baseHeight !== undefined) withMax(rules, "height", baseHeight + extraFloors * st + heightPerFloorAdd * (stories ?? 0), relaxProv);
     return analyse({ ...input, rules, relaxations: undefined });
   };
   let res = recompute();
   const discretionaryFloors = list.find((r) => r.quantified && r.tier === "discretionary" && r.effect.floorsAdd);
-  if (discretionaryFloors && res.figures.achievableGfaM2 < res.figures.maxGfaM2 - 0.5 && maxFloorsCap === Infinity) {
-    const fp = res.figures.footprintM2;
-    const neededFloors = fp > 0 ? Math.ceil(res.figures.maxGfaM2 / fp - 1e-9) : 0;
-    const extra = Math.max(0, Math.min(discretionaryFloors.effect.floorsAdd!, neededFloors - res.figures.allowedFloors));
-    if (extra > 0) {
-      floorsAdd += extra;
+  if (discretionaryFloors && res.figures.achievableGfaM2 < res.figures.maxGfaM2 - 0.5 && floorsTo === 0) {
+    // add floors one at a time, only while they are needed to build the extra density
+    let extra = 0;
+    while (extra < discretionaryFloors.effect.floorsAdd! && res.figures.achievableGfaM2 < res.figures.maxGfaM2 - 0.5) {
+      const before = res.figures.achievableGfaM2;
+      extra++;
+      floorsAdd++;
       res = recompute();
+      if (res.figures.achievableGfaM2 <= before + 0.5) {
+        floorsAdd--;
+        extra--;
+        res = recompute();
+        break;
+      }
+    }
+    if (extra > 0) {
       applied.push(toApplied(discretionaryFloors, { floorsAdd: extra, heightAddM: round(extra * st, 1) }));
       usedIds.add(discretionaryFloors.id);
     }

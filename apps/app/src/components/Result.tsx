@@ -14,6 +14,7 @@ export function reasonText(t: TFunction, lng: string, c: Pick<Check, "reasonKey"
   const params: Record<string, string> = {};
   for (const [k, v] of Object.entries(c.params ?? {})) {
     if (k === "use") params[k] = t(`use.${v}`);
+    else if (k === "type") params[k] = t(`unit.${v}`);
     else params[k] = typeof v === "number" ? fmtNumber(v, lng, 1) : String(v);
   }
   return t(c.reasonKey, params);

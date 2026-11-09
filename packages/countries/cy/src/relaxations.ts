@@ -1,4 +1,5 @@
-import type { Provenance, Relaxation, UseType, ZoneHit } from "@plotcheck/core";
+import type { Parcel, Provenance, Relaxation, UseType, ZoneHit } from "@plotcheck/core";
+import { larnacaStreetFrontage } from "./larnaca/frontage.ts";
 import { isContinuousBuilding } from "./rules.ts";
 
 /**
@@ -129,8 +130,8 @@ const upperSetbacks: Relaxation = {
   grantKey: "cy.relax.upperSetbacks.grant",
   conditionsKey: "cy.relax.upperSetbacks.conditions",
   instrument: "Εντολή 4/2026 §5.8, §5.2",
-  effect: {},
-  quantified: false,
+  effect: { setbackM: 3 },
+  quantified: true,
   provenance: o426("§5.8"),
 };
 
@@ -228,14 +229,21 @@ const familyFloor: Relaxation = {
 };
 
 // ---------- Larnaca Local Plan (plan 401) ----------
-// Secondary source citing Local Plan ch. 11.6 / 12.8 and Κ.Δ.Π. 89/2015 — verify against the plan text.
+// Primary source: Τοπικό Σχέδιο Λάρνακας 2019 — Πρόνοιες και Μέτρα Πολιτικής (ΤΠΟ, Δεκ. 2019),
+// chapters 11.6 (Urban Centre) and 12.8 (residential zones). Listed-building transfer limits per
+// receiving zone are from a secondary source (Axia Valuers) and flagged as such.
 
+const LP_LARNACA = "https://eoal.org.cy/wp-content/uploads/2024/07/Top_sx_3.pdf";
+const lp = (para: string) => src("Τοπικό Σχέδιο Λάρνακας 2019 (ΤΠΟ) — primary text", LP_LARNACA, para);
 const AXIA = "https://www.axiavaluers.com/en/news/36";
-const lca = (part: string) => src(`Larnaca Local Plan ${part} via Axia Valuers guide (28/5/2026) — secondary source`, AXIA, part);
+const axia = (part: string) => src(`Axia Valuers guide (28/5/2026) — secondary source, ${part}`, AXIA, part);
 
 const lcaResCap = { group: "cy.lca.residential", maxPct: 0.3 };
+const lcaUcCap = { group: "cy.lca.urban-centre", maxPct: 1.0 };
+const TRANSFER_20 = { type: "transfer" as const, noteKey: "cy.relax.lcaUrban.cost" };
 
-const lcaResRes: Relaxation = { ...res5, id: "cy.o4-2025.res", cap: lcaResCap };
+/** §12.8.2(γ): RES +5% in Κα/Πα/ΚΓ zones outside the Urban Centre — within the +30% cap (§12.8.3). */
+const lcaResRes: Relaxation = { ...res5, cap: lcaResCap };
 
 const lcaUnified: Relaxation = {
   id: "cy.lca.unified-complex",
@@ -243,12 +251,12 @@ const lcaUnified: Relaxation = {
   titleKey: "cy.relax.lcaUnified.title",
   grantKey: "cy.relax.lcaUnified.grant",
   conditionsKey: "cy.relax.lcaUnified.conditions",
-  instrument: "Τοπικό Σχέδιο Λάρνακας κεφ. 12.8",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §12.8.2(α), §12.8.3",
   effect: { farPct: 0.05 },
   exclusiveGroup: "cy.lca.complex",
   cap: lcaResCap,
-  quantified: false, // needs 4+ plots developed together (plot merging, phase 6)
-  provenance: lca("ch. 12.8"),
+  quantified: false, // needs 4+ normal-size plots developed together (plot merging)
+  provenance: lp("§12.8.2(α), §12.8.3"),
 };
 
 const lcaSocial: Relaxation = {
@@ -257,7 +265,9 @@ const lcaSocial: Relaxation = {
   titleKey: "cy.relax.lcaSocial.title",
   grantKey: "cy.relax.lcaSocial.grant",
   conditionsKey: "cy.relax.lcaSocial.conditions",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §12.8.2(β), §12.8.3, §12.9",
   effect: { farPct: 0.25 },
+  provenance: lp("§12.8.2(β)"),
 };
 
 const lcaListed = (pct: number, key: string): Relaxation => ({
@@ -270,32 +280,92 @@ const lcaListed = (pct: number, key: string): Relaxation => ({
   effect: { farPct: pct },
   cost: { type: "transfer", noteKey: "cy.relax.listed.cost" },
   quantified: true,
-  provenance: lca("Κ.Δ.Π. 89/2015 receiving-zone limits"),
+  provenance: axia("receiving-zone limits under Κ.Δ.Π. 89/2015"),
 });
 
-const lcaUrbanKep: Relaxation = {
+/** §11.6.2: selected streets of the Central Commercial Area. */
+const lcaKep = (continuous: boolean): Relaxation => ({
   id: "cy.lca.urban-kep",
   tier: "conditional",
   titleKey: "cy.relax.lcaKep.title",
   grantKey: "cy.relax.lcaKep.grant",
   conditionsKey: "cy.relax.lcaKep.conditions",
-  instrument: "Τοπικό Σχέδιο Λάρνακας κεφ. 11.6 (Κεντρική Εμπορική Περιοχή)",
-  effect: { farPct: 0.2, floorsAdd: 2, maxFar: 4 },
+  instrument: "Τοπικό Σχέδιο Λάρνακας §11.6.2.3, §11.6.5",
+  effect: { farPct: 0.2, floorsAdd: 2, coverageMax: continuous ? 0.55 : 0.4, maxFar: 4 },
   minPlotAreaM2: 1000,
-  exclusiveGroup: "cy.lca.urban",
-  cost: { type: "transfer", noteKey: "cy.relax.lcaUrban.cost" },
-  quantified: false, // depends on road frontage — shown as a note until frontage is checked automatically
-  provenance: lca("ch. 11.6"),
+  uses: ["commercial", "mixed_use"], // central uses must exceed 60% of the development
+  exclusiveGroup: "cy.lca.urban-street",
+  cap: lcaUcCap,
+  cost: TRANSFER_20,
+  quantified: true,
+  provenance: lp("§11.6.2"),
+});
+
+/** §11.6.3: commercial axes outside the ΚΕΠ — distances: 3 m road/sides on ground+1st, 5 m rear and upper floors. */
+const AXIS_SETBACKS = [
+  { condition: "floor <= 2", expression: 3 },
+  { condition: true, expression: 5 },
+];
+const lcaAxis = (big: boolean): Relaxation => ({
+  id: big ? "cy.lca.urban-axis-50" : "cy.lca.urban-axis-30",
+  tier: "conditional",
+  titleKey: "cy.relax.lcaAxis.title",
+  grantKey: big ? "cy.relax.lcaAxis.grant50" : "cy.relax.lcaAxis.grant30",
+  conditionsKey: "cy.relax.lcaAxis.conditions",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §11.6.3.2, §11.6.5",
+  effect: { farPct: big ? 0.5 : 0.3, maxFloors: 12, coverageMax: 0.35, maxFar: 4, setbackRule: AXIS_SETBACKS },
+  minPlotAreaM2: big ? 4000.01 : 1000,
+  ...(big ? {} : { maxPlotAreaM2: 4000 }),
+  uses: ["commercial", "mixed_use"], // central uses must exceed 60% of the development
+  exclusiveGroup: "cy.lca.urban-street",
+  cap: lcaUcCap,
+  cost: TRANSFER_20,
+  quantified: true,
+  provenance: lp("§11.6.3"),
+});
+
+/** §11.6.4.1: +15% where ≥20% of the floor area is residential, in the ΚΕΠ or on the axes. */
+const lcaUcHousingMix: Relaxation = {
+  id: "cy.lca.uc-housing-mix",
+  tier: "conditional",
+  titleKey: "cy.relax.lcaMix.title",
+  grantKey: "cy.relax.lcaMix.grant",
+  conditionsKey: "cy.relax.lcaMix.conditions",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §11.6.4.1, §11.6.5",
+  effect: { farPct: 0.15, maxFar: 4 },
+  uses: ["mixed_use", "apartment_block"],
+  cap: lcaUcCap,
+  cost: TRANSFER_20,
+  quantified: true,
+  provenance: lp("§11.6.4.1"),
 };
 
-const lcaUrbanAxis: Relaxation = {
-  ...lcaUrbanKep,
-  id: "cy.lca.urban-axis",
-  titleKey: "cy.relax.lcaAxis.title",
-  grantKey: "cy.relax.lcaAxis.grant",
-  conditionsKey: "cy.relax.lcaAxis.conditions",
-  instrument: "Τοπικό Σχέδιο Λάρνακας κεφ. 11.6 (εμπορικοί άξονες εκτός ΚΕΠ)",
-  effect: { farPct: 0.5, maxFloors: 12, coverageMax: 0.35, maxFar: 4 },
+/** §11.6.4.2: residential zones inside the Urban Centre (needs Plan No. 6 boundary — note only for now). */
+const lcaUcResidential: Relaxation = {
+  id: "cy.lca.uc-residential",
+  tier: "conditional",
+  titleKey: "cy.relax.lcaUcRes.title",
+  grantKey: "cy.relax.lcaUcRes.grant",
+  conditionsKey: "cy.relax.lcaUcRes.conditions",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §11.6.4.2, §11.6.5",
+  effect: { farPct: 0.3, floorsAdd: 2 },
+  minPlotAreaM2: 1000,
+  uses: ["apartment_block", "row_houses"],
+  cost: TRANSFER_20,
+  quantified: false,
+  provenance: lp("§11.6.4.2"),
+};
+
+const lcaFloor128: Relaxation = {
+  id: "cy.lca.res-extra-floor",
+  tier: "discretionary",
+  titleKey: "cy.relax.lcaFloor.title",
+  grantKey: "cy.relax.lcaFloor.grant",
+  conditionsKey: "cy.relax.lcaFloor.conditions",
+  instrument: "Τοπικό Σχέδιο Λάρνακας §12.8.3(δ)",
+  effect: {},
+  quantified: false,
+  provenance: lp("§12.8.3(δ)"),
 };
 
 // ---------- Selection ----------
@@ -304,34 +374,58 @@ const first = (z: ZoneHit) => z.zoneCode.trim().charAt(0);
 const isCoreOrHistoric = (z: ZoneHit) => /ΙΣΤΟΡΙΚ|ΕΙΔΙΚΟΥ\s+ΧΑΡΑΚΤΗΡΑ|ΠΥΡΗΝ(ΑΣ|Α)?\s+ΟΙΚΙΣΜ/i.test(z.description ?? "");
 const isPolicyStatement = (z: ZoneHit) => /ΔΗΛΩΣΗ\s+ΠΟΛΙΤΙΚΗΣ/i.test(z.planName ?? "");
 const isLarnacaLP = (z: ZoneHit) => z.planRef === "401";
+/** Κα, Πα and ΚΓ zones — the only zones where §12.8 incentives apply (§12.8.4). */
+const isLcaResidentialZone = (z: ZoneHit) => /^(Κα|Πα|ΚΓ)/.test(z.zoneCode.trim());
 
-/** All relaxations that may apply to a plot in this zone. Engine decides how they combine. */
-export function cyRelaxationsFor(zone: ZoneHit, baseFar?: number): Relaxation[] {
+export interface CyRelaxationContext {
+  baseFar?: number;
+  parcel?: Parcel;
+}
+
+/** All relaxations that may apply to a plot in this zone. The engine decides how they combine. */
+export function cyRelaxationsFor(zone: ZoneHit, ctx: CyRelaxationContext | number = {}): Relaxation[] {
+  const { baseFar, parcel } = typeof ctx === "number" ? { baseFar: ctx, parcel: undefined } : ctx;
   const out: Relaxation[] = [verandas, basement, pilotis, roofAttic, coverageAdjust, upperSetbacks, slopeFloor, recovery, familyFloor];
   if (!isCoreOrHistoric(zone)) out.push(officeHeight);
   out.push(extraFloors(isPolicyStatement(zone) ? 1 : 2));
   if (isContinuousBuilding(zone)) out.push(continuousSetback);
 
-  const residential = first(zone) === "Κ" || first(zone) === "Π";
   const commercial = first(zone) === "Ε";
   const tourist = first(zone) === "Τ";
   const agricultural = first(zone) === "Γ" || first(zone) === "Ζ";
-
   if (!agricultural) out.push(affordable45, buyout25);
 
-  if (isLarnacaLP(zone)) {
-    if (residential) {
-      out.push(lcaResRes, lcaUnified, lcaSocial);
-      out.push(lcaListed((baseFar ?? 0) < 0.6 ? 0.1 : 0.05, (baseFar ?? 0) < 0.6 ? "cy.relax.listed.grantRes10" : "cy.relax.listed.grantRes5"));
-    } else {
-      out.push(res5);
-      if (commercial) out.push(lcaListed(0.2, "cy.relax.listed.grantCom"), lcaUrbanKep, lcaUrbanAxis);
-      if (tourist) out.push(lcaListed(0.15, "cy.relax.listed.grantTour"));
-    }
+  if (!isLarnacaLP(zone)) {
+    if (!agricultural) out.push(res5);
+    return out;
+  }
+
+  // Larnaca Local Plan
+  const frontage = parcel ? larnacaStreetFrontage(parcel) : [];
+  const onKep = frontage.some((f) => f.group === "kep");
+  const onAxis = frontage.some((f) => f.group === "axis");
+  const inUrbanCentreStreet = onKep || onAxis;
+
+  if (inUrbanCentreStreet && !isCoreOrHistoric(zone)) {
+    if (onKep) out.push(lcaKep(isContinuousBuilding(zone)));
+    if (onAxis) out.push(lcaAxis(false), lcaAxis(true));
+    out.push(lcaUcHousingMix, res5);
+  } else if (isLcaResidentialZone(zone) && !isCoreOrHistoric(zone)) {
+    out.push(lcaResRes, lcaUnified, lcaSocial, lcaFloor128, lcaUcResidential);
   } else if (!agricultural) {
     out.push(res5);
+  }
+  if (isLcaResidentialZone(zone)) {
+    out.push(lcaListed((baseFar ?? 0) < 0.6 ? 0.1 : 0.05, (baseFar ?? 0) < 0.6 ? "cy.relax.listed.grantRes10" : "cy.relax.listed.grantRes5"));
+  } else if (commercial) {
+    out.push(lcaListed(onKep ? 0.25 : 0.2, onKep ? "cy.relax.listed.grantKep" : "cy.relax.listed.grantCom"));
+  } else if (tourist) {
+    out.push(lcaListed(0.15, "cy.relax.listed.grantTour"));
   }
   return out;
 }
 
-export const CY_RELAXATION_SOURCES = { ORDER_4_2026, AXIA };
+/** Frontage details for the UI notes (which plan street the plot was found to front). */
+export { larnacaStreetFrontage };
+
+export const CY_RELAXATION_SOURCES = { ORDER_4_2026, AXIA, LP_LARNACA };

@@ -125,9 +125,12 @@ export function analyse(input: AnalysisInput): AnalysisResult {
   const allowedFloors = candidates.length ? Math.min(...candidates) : 0;
   if (!candidates.length) checks.push({ id: "floors", status: "maybe", reasonKey: "reason.floors_unknown" });
 
-  // ---- 5. Setbacks → buildable footprint on the real plot shape
-  const vars = { height: maxHeightM ?? allowedFloors * params.storeyHeightM, stories: allowedFloors, lot_area: plotAreaM2 };
+  // ---- 5. Setbacks → buildable footprint on the real plot shape, per floor.
+  // Distances can step back with height (e.g. 3 m up to the 3rd floor, 4 m on the 4th, 5 m above),
+  // so each floor gets its own footprint. Rules may use the variable `floor` (1 = ground floor).
+  const vars = { height: maxHeightM ?? allowedFloors * params.storeyHeightM, stories: allowedFloors, lot_area: plotAreaM2, floor: 1 };
   const setbackNames: ConstraintName[] = ["setback_dist_boundary", "setback_side_int", "setback_rear"];
+  const setbackAt = (floor: number) => setbackNames.map((n) => minOf(rules, n, { ...vars, floor })).filter((x) => x !== undefined);
   const sb = setbackNames.map((n) => track(n, minOf(rules, n, vars))).filter((x) => x !== undefined);
   const front = track("setback_front", minOf(rules, "setback_front", vars));
   let setbackM: number | undefined;
@@ -141,12 +144,21 @@ export function analyse(input: AnalysisInput): AnalysisResult {
       toBeChecked.add("check.engineer.setbacks");
     }
   }
-  if (site.geometry && setbackM !== undefined) {
-    const inner = setbackM > 0
-      ? buffer({ type: "Feature", properties: {}, geometry: site.geometry } as Feature<Polygon | MultiPolygon>, -setbackM, { units: "meters" })
-      : ({ type: "Feature", properties: {}, geometry: site.geometry } as Feature<Polygon | MultiPolygon>);
-    netFootprintM2 = inner?.geometry ? round(area(inner), 1) : 0;
-    buildableFootprint = inner?.geometry as AnalysisResult["buildableFootprint"];
+  const siteFeature = site.geometry ? ({ type: "Feature", properties: {}, geometry: site.geometry } as Feature<Polygon | MultiPolygon>) : undefined;
+  const insetCache = new Map<number, { area: number; geometry?: AnalysisResult["buildableFootprint"] }>();
+  const inset = (m: number) => {
+    let hit = insetCache.get(m);
+    if (!hit && siteFeature) {
+      const f = m > 0 ? buffer(siteFeature, -m, { units: "meters" }) : siteFeature;
+      hit = { area: f?.geometry ? round(area(f), 1) : 0, geometry: f?.geometry as AnalysisResult["buildableFootprint"] };
+      insetCache.set(m, hit);
+    }
+    return hit;
+  };
+  if (siteFeature && setbackM !== undefined) {
+    const g = inset(setbackM)!;
+    netFootprintM2 = g.area;
+    buildableFootprint = g.geometry;
     checks.push({
       id: "setbacks",
       status: netFootprintM2 > 0 ? "allowed" : "not_allowed",
@@ -168,10 +180,33 @@ export function analyse(input: AnalysisInput): AnalysisResult {
     checks.push({ id: "coverage_limited_by_setbacks", status: "allowed", reasonKey: "reason.coverage_limited", params: { coverage: maxCoverageM2, footprint: netFootprintM2 } });
   }
 
-  // ---- 6. Capacity
-  const achievableGfaM2 = round(Math.min(maxGfaM2, footprintM2 * allowedFloors), 1);
-  const feasibleFloors = footprintM2 > 0 ? Math.min(allowedFloors, Math.ceil(maxGfaM2 / footprintM2 - 1e-9)) : 0;
-  const perFloorM2 = splitFloors(achievableGfaM2, footprintM2, feasibleFloors);
+  // Per-floor setback and floor-plate area (never larger than the ground-floor footprint)
+  const setbackByFloor: number[] = [];
+  const floorPlateM2: number[] = [];
+  for (let f = 1; f <= allowedFloors; f++) {
+    const s = setbackAt(f);
+    const sf = s.length ? Math.max(...s.map((x) => x.value)) : undefined;
+    if (sf !== undefined) setbackByFloor.push(sf);
+    const plate = siteFeature && sf !== undefined ? Math.min(footprintM2, inset(sf)!.area) : footprintM2;
+    floorPlateM2.push(round(plate, 1));
+  }
+  const stepped = setbackByFloor.some((x) => x !== setbackByFloor[0]);
+  if (stepped) {
+    const firstStep = setbackByFloor.findIndex((x) => x !== setbackByFloor[0]);
+    checks.push({ id: "stepped_setbacks", status: "allowed", reasonKey: "reason.stepped_setbacks", params: { floor: firstStep + 1, setback: setbackByFloor[firstStep]!, top: setbackByFloor.at(-1)! } });
+  }
+
+  // ---- 6. Capacity: fill floors from the ground up until the density is used
+  const perFloorM2: number[] = [];
+  let left = maxGfaM2;
+  for (const plate of floorPlateM2) {
+    if (left <= 0.01 || plate <= 0) break;
+    const a = Math.min(plate, left);
+    perFloorM2.push(round(a, 1));
+    left -= a;
+  }
+  const achievableGfaM2 = round(perFloorM2.reduce((a, b) => a + b, 0), 1);
+  const feasibleFloors = perFloorM2.length;
   if (achievableGfaM2 < maxGfaM2 - 0.5) {
     checks.push({ id: "density_unused", status: "allowed", reasonKey: "reason.density_unused", params: { unused: round(maxGfaM2 - achievableGfaM2, 0) } });
   }
@@ -229,6 +264,22 @@ export function analyse(input: AnalysisInput): AnalysisResult {
     const { total, byType } = unitEstimate(sellableM2, params.unitMix, params.unitSizeM2);
     result.units = { sellableM2, total, byType, parking: parking(total) };
     if (total === 0) checks.push({ id: "units", status: "not_allowed", reasonKey: "reason.no_units" });
+    const dw = rules.dwellings;
+    if (dw && total > 0) {
+      if (dw.provenance.status !== "verified") needsReview.push({ constraint: "unit_size", provenance: dw.provenance });
+      const kinds = (["studio", "bed1", "bed2", "bed3"] as const).filter((k) => byType[k] > 0);
+      // average sizes include walls/verandas share; compare the usable part (net-to-gross) with the minimum
+      const small = kinds.filter((k) => params.unitSizeM2[k] < dw.minUsableM2[k] - 1e-9);
+      checks.push(
+        small.length
+          ? { id: "unit_sizes", status: "not_allowed", reasonKey: "reason.unit_size_small", params: { type: small[0]!, size: params.unitSizeM2[small[0]!], min: dw.minUsableM2[small[0]!] } }
+          : { id: "unit_sizes", status: "allowed", reasonKey: "reason.unit_size_ok" },
+      );
+      const cap = dw.maxStudioShare;
+      if (cap && total >= cap.fromUnits && byType.studio / total > cap.share + 1e-9) {
+        checks.push({ id: "studio_share", status: "not_allowed", reasonKey: "reason.studio_share", params: { share: Math.round(cap.share * 100) } });
+      }
+    }
   } else if (use === "house") {
     result.houses = { count: achievableGfaM2 > 0 ? 1 : 0, gfaEachM2: achievableGfaM2, parking: parking(achievableGfaM2 > 0 ? 1 : 0) };
   } else if (use === "row_houses") {
@@ -265,6 +316,7 @@ export function analyse(input: AnalysisInput): AnalysisResult {
     feasibleFloors,
     achievableGfaM2,
     perFloorM2,
+    ...(setbackByFloor.length ? { setbackByFloorM: setbackByFloor.slice(0, Math.max(feasibleFloors, 1)) } : {}),
     buildingHeightM,
   };
   if (!rules.curated) checks.push({ id: "zone_not_curated", status: "maybe", reasonKey: "reason.zone_not_curated", params: { zone: rules.dist_abbr } });

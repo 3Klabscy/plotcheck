@@ -12,12 +12,33 @@ const assumption = (note: string): Provenance => ({
   status: "needs_review",
 });
 
+/**
+ * Distance from side/rear boundaries, stepping back with height: 3 m up to the 3rd floor,
+ * 4 m on the 4th, 5 m from the 5th floor up. Local Plans, Annex B §11.1(ε), as illustrated in
+ * the ETEK guide to planning regulations (Feb 2025, Diagram 37). Order 4/2026 §5.8 lets the
+ * authority reduce the upper-floor distances (modelled as a relaxation).
+ */
+export const steppedBoundary = {
+  min_val: [
+    { condition: "floor <= 3", expression: 3 },
+    { condition: "floor == 4", expression: 4 },
+    { condition: true, expression: 5 },
+  ],
+  provenance: {
+    source: "Local Plans Annex B §11.1(ε) — via ETEK guide to planning regulations (2025), Diagram 37",
+    sourceRef: "https://www.etek.org.cy/uploads/2025/d2d58622Yh.pdf",
+    page: "p. 41",
+    status: "needs_review" as const,
+  },
+  notes: "3 m up to the 3rd floor, 4 m on the 4th floor, 5 m from the 5th floor up.",
+};
+
 /** Country-wide fallbacks (lowest precedence). */
 export const cyCountryLayer: RuleLayer = {
   level: "country",
   match: { path: ["CY"] },
   constraints: {
-    setback_dist_boundary: constant("min", 3, assumption("Typical 3.0 m distance from side/rear boundaries; larger distances may apply for openings and taller buildings."), "Uniform boundary distance applied to the whole perimeter in phase 1."),
+    setback_dist_boundary: steppedBoundary,
     parking_per_unit: { min_val: [{ expression: [1, 1.5] }], provenance: assumption("Indicative 1–1.5 spaces per dwelling; check the Local Plan parking norms."), notes: "Range: minimum to typical." },
     parking_per_100m2_commercial: { min_val: [{ expression: [2.5, 3.3] }], provenance: assumption("Indicative 1 space per 30–40 m² of commercial floor area.") },
   },
@@ -113,7 +134,7 @@ export const larnacaKa4: RuleLayer = {
     lot_cov_bldg: constant("max", 0.5, ka4Source),
     stories: constant("max", 3, ka4Source),
     height: constant("max", 13.5, ka4Source),
-    setback_dist_boundary: constant("min", 3, ka4Source, "Distance from side and rear boundaries."),
+    setback_dist_boundary: steppedBoundary,
     parking_per_unit: { min_val: [{ expression: [1, 1.5] }], provenance: ka4Source },
   },
   provisions: [
@@ -124,4 +145,20 @@ export const larnacaKa4: RuleLayer = {
   updatedAt: "2026-11-09",
 };
 
-export const cyRuleLayers: RuleLayer[] = [cyCountryLayer, larnacaKa4];
+/** Larnaca Local Plan, plan-wide: dwelling standards (Table 12.1 "other areas", §12.12.8). */
+export const larnacaPlanLayer: RuleLayer = {
+  level: "plan",
+  match: { path: ["CY", "4"], plan: "401" },
+  dwellings: {
+    minUsableM2: { studio: 35, bed1: 50, bed2: 75, bed3: 95 },
+    maxStudioShare: { share: 0.25, fromUnits: 5 },
+    provenance: {
+      source: "Τοπικό Σχέδιο Λάρνακας 2019, Πίνακας 12.1 (λοιπές περιοχές) και §12.12.8 — primary text",
+      sourceRef: "https://eoal.org.cy/wp-content/uploads/2024/07/Top_sx_3.pdf",
+      page: "§12.12",
+      status: "needs_review",
+    },
+  },
+};
+
+export const cyRuleLayers: RuleLayer[] = [cyCountryLayer, larnacaPlanLayer, larnacaKa4];

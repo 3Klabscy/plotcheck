@@ -134,7 +134,7 @@ export interface CountryModule {
   /** Map published zone codes to permitted uses where the country has a naming convention. */
   usesForZone?(zone: ZoneHit): { value: UseType[] | null; conditional: UseType[]; provenance: Provenance };
   /** Planning relaxations/incentives that may apply to a plot in this zone (island-wide + area). */
-  relaxationsFor?(zone: ZoneHit, baseFar?: number): Relaxation[];
+  relaxationsFor?(zone: ZoneHit, ctx: { baseFar?: number; parcel?: Parcel }): Relaxation[];
   /** Turn a published zone hit into a "source" rule layer (coefficients the source publishes). */
   sourceLayerForZone?(zone: ZoneHit): RuleLayer;
   /** Coverage of curated rules shipped with this module (for the admin coverage map later). */

@@ -33,9 +33,43 @@ Catalogue in `packages/countries/cy/src/relaxations.ts`. Researched 2026-11-09. 
 | `cy.scheme.buyout-25` | ~+25% density for a payment into the Affordable Housing Fund | Conditional, cost | alternative | Secondary (Axia) |
 | `cy.scheme.recovery` | Buy extra density at 50% (70% outside designated areas) of its value | Conditional, cost | note | Cabinet proposal 15/12/2023 — primary |
 | `cy.scheme.family-floor` | Extra floor or unit for family, ~150/180 m², existing houses, to end of 2027 | Conditional | note | Press 09/2026 — scheme guide to check |
-| `cy.lca.unified-complex` / `social-complex` | +5% / +25% for 4+ plots (cap +30% with RES) | Conditional | note (needs merged plots) | Larnaca LP ch. 12.8 — secondary |
-| `cy.lca.listed-transfer` | +5–25% via transfer from a listed building (Κ.Δ.Π. 89/2015) | Conditional, cost | yes | Secondary |
-| `cy.lca.urban-kep` / `urban-axis` | City centre streets/axes: +20% / +30–50%, floors, coverage limits | Conditional | note (road frontage not yet checked) | Larnaca LP ch. 11.6 — secondary |
+| `cy.lca.unified-complex` / `social-complex` | +5% / +25% for 4+ normal plots; with RES max +30% | Conditional | note (needs merged plots) | Larnaca LP 2019 §12.8 — **primary** |
+| `cy.o4-2025.res` (Larnaca residential) | +5% within the §12.8 +30% cap (Κα/Πα/ΚΓ outside the Urban Centre) | Conditional | yes | Larnaca LP §12.8.2(γ) — **primary** |
+| `cy.lca.res-extra-floor` | +1 floor with reduced coverage when §12.8 incentives are used | Discretionary | note | §12.8.3(δ) — **primary** |
+| `cy.lca.urban-kep` | Central Commercial Area streets: +20% (central-use share >60%), +2 floors, coverage 0.40/0.55, plot ≥1,000 m² | Conditional | yes, if frontage detected; commercial/mixed only | §11.6.2 — **primary** |
+| `cy.lca.urban-axis-30` / `-50` | Makariou III, Gr. Afxentiou, Artemidos (north): +30% (1,000–4,000 m²) / +50% (>4,000 m²), up to 12 floors, coverage 0.35, distances 3 m (ground, 1st) / 5 m | Conditional | yes, if frontage detected; commercial/mixed only | §11.6.3 — **primary** |
+| `cy.lca.uc-housing-mix` | +15% where ≥20% of the floor area is housing (ΚΕΠ/axes) | Conditional | yes, if frontage detected | §11.6.4.1 — **primary** |
+| `cy.lca.uc-residential` | Urban Centre residential zones: +25% / +30%, +2 floors | Conditional | note (Urban Centre boundary not yet digitised) | §11.6.4.2 — **primary** |
+| `cy.lca.listed-transfer` | +5–25% via transfer from a listed building (Κ.Δ.Π. 89/2015) | Conditional, cost | yes | Receiving-zone limits — secondary (Axia) |
+
+All Urban Centre bonuses need a listed-building transfer equal to 20% of the bonus (§11.6.5α). They
+don't apply in Areas of Special Character or Antiquities-controlled areas. Combined, they may reach
++100%, capped at 4.00:1.
+
+### Larnaca dwelling standards (in the calculation)
+
+- **Minimum usable area** (Table 12.1, outside the Urban Centre): studio 35 m², 1-bed 50 m²,
+  2-bed 75 m², 3-bed 95 m². In the Urban Centre: 30 / 45 / 65 / 85 m².
+- **Studio share:** studios may not exceed 25% of the units in developments of 5 or more
+  (§12.12.8).
+
+### Boundary distances (in the calculation)
+
+- **Base rule** (Local Plans Annex B §11.1(ε), via the ETEK 2025 guide, Diagram 37): 3 m up to
+  the 3rd floor, 4 m on the 4th, 5 m from the 5th floor up. The engine computes each floor's
+  plate on the real plot shape.
+- **Reductions** (Order 4/2026 §5.8): the authority may reduce the upper-floor distances; this
+  is used in the relaxed scenario.
+
+### Street frontage (Larnaca)
+
+`packages/countries/cy/src/larnaca/frontage.ts` detects which plan street a plot fronts, using
+OSM street geometry (© OpenStreetMap contributors, ODbL, bundled extract dated 2026-11-09). These
+streets are not covered yet:
+- Plateia Vasileos Pavlou;
+- Zinonos Pieridi;
+- the part of Kalogera named in §11.6.2.1;
+- the harbour-roundabout plots (§11.6.3.1).
 
 ## Sources
 
@@ -43,6 +77,8 @@ Catalogue in `packages/countries/cy/src/relaxations.ts`. Researched 2026-11-09. 
 - Order 4/2025 notice: https://eoal.org.cy/dimosiefsi-entolis-4-2025-gia-afxisi-tis-energeiakis-apodosis-anaptyxeon/
 - Incentives scheme, Cabinet proposal 15/12/2023: https://eoal.org.cy/wp-content/uploads/2024/07/Kin_an_13.pdf
 - Scheme extension (gov.cy): https://www.gov.cy/esoterika-themata/epekteinetai-i-ischys-tou-schediou-parochis-poleodomikon-kinitron-gia-anakampsi-tis-epicheirimatikis-drastiriotitas-stin-kypro/
+- Larnaca Local Plan 2019 (full text): https://eoal.org.cy/wp-content/uploads/2024/07/Top_sx_3.pdf
+- ETEK guide to planning regulations (2025): https://www.etek.org.cy/uploads/2025/d2d58622Yh.pdf
 - Larnaca incentives guide (secondary): https://www.axiavaluers.com/en/news/36
 - Family extra-floor scheme: https://cyprus-mail.com/2026/09/17/ministry-unveils-new-scheme-allowing-families-to-build-extra-floor-for-relatives
 
@@ -50,9 +86,9 @@ Catalogue in `packages/countries/cy/src/relaxations.ts`. Researched 2026-11-09. 
 
 - Confirm the affordable-housing scheme's current terms and whether it applies after 31/12/2025.
 - Read Order 4/2025 itself, including its energy thresholds.
-- Check the Larnaca LP chapters 11.6 and 12.8 against the plan text.
 - Add the incentive chapters of the other Local Plans (Nicosia, Limassol, Paphos, Famagusta)
   and of the Policy Statement.
 - Check road frontage automatically (DLS road network) so the city-centre axis bonuses can be
   calculated instead of only listed.
-- Local base boundary distances (Annex B §11.1 of each Local Plan) should replace the 3 m default.
+- Digitise the Larnaca Urban Centre boundary (Plan No. 6) so §11.6.4.2 can be calculated.
+- Read Annex B itself (not only the ETEK summary) for the front/road distances.

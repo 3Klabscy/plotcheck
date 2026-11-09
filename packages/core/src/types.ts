@@ -139,6 +139,15 @@ export interface ZoneRuleSet {
   /** True when a human-curated record exists for this zone (vs. source data only). */
   curated: boolean;
   updatedAt: string;
+  /** Dwelling standards: minimum usable floor area per unit type and studio share cap. */
+  dwellings?: DwellingRules;
+}
+
+export interface DwellingRules {
+  minUsableM2: { studio: number; bed1: number; bed2: number; bed3: number };
+  /** Max share of studios in developments of `fromUnits` units or more. */
+  maxStudioShare?: { share: number; fromUnits: number };
+  provenance: Provenance;
 }
 
 /** A partial rule set used at one level of the jurisdiction hierarchy (country, region, plan, zone). */
@@ -173,9 +182,11 @@ export interface RelaxationEffect {
   basementExcluded?: boolean;
   /** Side/rear boundary distance that may apply instead of the default (m). */
   setbackM?: number;
+  /** Boundary-distance rule imposed by a scheme when used (OZFS min_val entries, may use `floor`). */
+  setbackRule?: ConstraintValue[];
   /** Coverage the scheme imposes when used (fraction). */
   coverageMax?: number;
-  /** Absolute floor cap the scheme imposes when used. */
+  /** Floors permitted (up to this number) when the scheme is used, e.g. "up to 12 floors". */
   maxFloors?: number;
   /** Absolute density ceiling the scheme imposes. */
   maxFar?: number;

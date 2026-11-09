@@ -192,7 +192,7 @@ export function createApi(deps: ApiDeps) {
       const params = mergeParams(defaultParams(country), b["params"]);
       const site = { geometry: parcel.geometry, officialAreaM2: parcel.officialAreaM2 };
       const baseFar = z.primary.rules.constraints.far?.max_val?.[0]?.expression;
-      const relaxations = country.relaxationsFor?.(z.primary.zone, typeof baseFar === "number" ? baseFar : undefined) ?? [];
+      const relaxations = country.relaxationsFor?.(z.primary.zone, { baseFar: typeof baseFar === "number" ? baseFar : undefined, parcel }) ?? [];
       const useRaw = b["use"];
       let results: AnalysisResult[];
       if (useRaw === "all") results = compareScenarios({ site, rules: z.primary.rules, params, relaxations });

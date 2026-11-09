@@ -18,5 +18,7 @@
 - Cadastral parcels, planning zones, orthophotos: **Department of Lands and Surveys,
   Republic of Cyprus** — INSPIRE services (eservices.dls.moi.gov.cy). Attribution is shown in
   the app. Confirm the terms of use for commercial redistribution (see TECHNICAL_PLAN §6).
+- Larnaca plan-street geometry (`packages/countries/cy/src/larnaca/streets.ts`): © OpenStreetMap
+  contributors, ODbL 1.0 — the extract is shared under the same licence.
 - Street map tiles: © OpenStreetMap contributors (prototype only — the OSMF tile usage policy
   does not allow production app traffic; replace with a hosted tile provider).

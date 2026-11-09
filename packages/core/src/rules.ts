@@ -48,6 +48,7 @@ export function resolveRules(jurisdiction: Jurisdiction, distAbbr: string, layer
     if (l.constraints) out.constraints = { ...out.constraints, ...l.constraints };
     if (l.bonuses) out.bonuses = [...out.bonuses, ...l.bonuses];
     if (l.provisions) out.provisions = [...out.provisions, ...l.provisions];
+    if (l.dwellings) out.dwellings = l.dwellings;
     if (l.level === "zone" && l.curated !== false) out.curated = true;
     if (l.updatedAt && l.updatedAt > out.updatedAt) out.updatedAt = l.updatedAt;
   }

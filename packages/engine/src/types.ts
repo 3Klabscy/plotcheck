@@ -68,6 +68,8 @@ export interface Figures {
   feasibleFloors: number;
   achievableGfaM2: number;
   perFloorM2: number[];
+  /** Boundary distance applied on each floor (index 0 = ground floor). */
+  setbackByFloorM?: number[];
   buildingHeightM: number;
 }
 
@@ -79,7 +81,7 @@ export interface UnitEstimate {
 }
 
 export interface ReviewWarning {
-  constraint: ConstraintName | "uses_allowed";
+  constraint: ConstraintName | "uses_allowed" | "unit_size";
   provenance: Provenance;
 }
 
