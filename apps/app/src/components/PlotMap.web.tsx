@@ -133,7 +133,11 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       const bb = m.getBounds();
       latest.current.onMove?.({ lng: c.lng, lat: c.lat, zoom: m.getZoom(), bbox: [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()] });
     };
-    m.once("load", reportView);
+    m.once("load", () => {
+      reportView();
+    });
+    // start with the credits folded behind the (i) button (MapLibre opens them while loading); they open on tap
+    m.once("idle", () => el.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
     m.on("moveend", () => {
       reportView();
       refreshContours();

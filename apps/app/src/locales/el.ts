@@ -330,5 +330,6 @@ const el: Record<string, string> = {
   "error.import_empty": "Το αρχείο δεν περιέχει σχήματα που μπορούμε να δείξουμε.",
   "error.import_unknown_crs": "Οι συντεταγμένες του αρχείου είναι σε άγνωστο σύστημα.",
   "error.import_unsupported": "Χρησιμοποιήστε αρχείο GeoJSON, KML ή DXF.",
+  "map.tools": "Εργαλεία",
 };
 export default el;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { NationalGrid, Parcel } from "@plotcheck/core";
 import { allPositions, feature, toDxf, toGeoJson, toKml, type UserCollection, type UserFeature } from "../lib/userLayer";
@@ -153,25 +153,45 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
   };
   const name = plot ? plot.nationalRef.replace(/[^\w-]+/g, "_") : "plot";
   const minPts = measure === "area" ? 3 : 1;
-  return (
+  // phones: Layers + one "Tools" menu instead of a row of chips
+  const { width } = useWindowDimensions();
+  const compact = width < 700;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const close = () => setMenuOpen(false);
+  const toolChips = (
     <>
-      <View style={{ position: "absolute", left: 10, top: 10, right: 52, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        <Pressable testID="btn-layers" onPress={onLayers} style={chip(layersOpen)}><Text style={chipText(layersOpen)}>☰ {t("map.layers")}</Text></Pressable>
-        <Pressable testID="btn-find" onPress={() => setFindOpen((o) => !o)} style={chip(findOpen)}><Text style={chipText(findOpen)}>🔎 {t("map.findHere")}</Text></Pressable>
+      <Pressable testID="btn-find" onPress={() => { setFindOpen((o) => !o); close(); }} style={chip(findOpen)}><Text style={chipText(findOpen)}>🔎 {t("map.findHere")}</Text></Pressable>
         {(["distance", "area"] as const).map((m) => (
-          <Pressable key={m} testID={`tool-${m}`} onPress={() => onMeasure(measure === m ? "none" : m)} style={chip(measure === m)}>
+          <Pressable key={m} testID={`tool-${m}`} onPress={() => { onMeasure(measure === m ? "none" : m); close(); }} style={chip(measure === m)}>
             <Text style={chipText(measure === m)}>{m === "distance" ? "📏" : "▱"} {t(`map.tool.${m}`)}</Text>
           </Pressable>
         ))}
-        <Pressable testID="tool-import" onPress={onImport} style={chip(false)}><Text style={chipText(false)}>⤒ {t("map.import")}</Text></Pressable>
+        <Pressable testID="tool-import" onPress={() => { onImport(); close(); }} style={chip(false)}><Text style={chipText(false)}>⤒ {t("map.import")}</Text></Pressable>
         {drawingsCount > 0 && (
-          <Pressable testID="btn-drawings" onPress={onDrawings} style={chip(drawingsOpen)}><Text style={chipText(drawingsOpen)}>✎ {t("map.drawings", { count: drawingsCount })}</Text></Pressable>
+          <Pressable testID="btn-drawings" onPress={() => { onDrawings(); close(); }} style={chip(drawingsOpen)}><Text style={chipText(drawingsOpen)}>✎ {t("map.drawings", { count: drawingsCount })}</Text></Pressable>
         )}
         <Pressable testID="tool-share" onPress={share} style={chip(copied)}><Text style={chipText(copied)}>🔗 {copied ? t("map.copied") : t("map.share")}</Text></Pressable>
         {plot && (
-          <Pressable testID="tool-export" onPress={() => setExportOpen((o) => !o)} style={chip(exportOpen)}><Text style={chipText(exportOpen)}>⤓ {t("map.export")}</Text></Pressable>
+          <Pressable testID="tool-export" onPress={() => { setExportOpen((o) => !o); close(); }} style={chip(exportOpen)}><Text style={chipText(exportOpen)}>⤓ {t("map.export")}</Text></Pressable>
         )}
+    </>
+  );
+  return (
+    <>
+      <View style={{ position: "absolute", left: 10, top: 10, right: 52, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        <Pressable testID="btn-layers" onPress={() => { onLayers(); close(); }} style={chip(layersOpen)}><Text style={chipText(layersOpen)}>☰ {t("map.layers")}</Text></Pressable>
+        {compact ? (
+          <Pressable testID="btn-tools" onPress={() => setMenuOpen((o) => !o)} style={chip(menuOpen)}><Text style={chipText(menuOpen)}>🛠 {t("map.tools")} ▾</Text></Pressable>
+        ) : (
+          toolChips
+        )}
+        {compact && measure !== "none" && <View style={chip(true)}><Text style={chipText(true)}>{t(`map.tool.${measure}`)}</Text></View>}
       </View>
+      {compact && menuOpen && (
+        <View testID="tools-menu" style={{ position: "absolute", left: 10, top: 48, backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, padding: 8, gap: 6, alignItems: "flex-start", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 10 }}>
+          {toolChips}
+        </View>
+      )}
       {findOpen && (
         <View testID="find-box" style={{ position: "absolute", left: 10, top: 48, width: 260, backgroundColor: colors.panel, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 10 }}>
           <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>{t("map.findHereHint")}</Text>

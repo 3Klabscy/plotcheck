@@ -330,5 +330,6 @@ const en: Record<string, string> = {
   "error.import_empty": "The file contains no shapes we can show.",
   "error.import_unknown_crs": "The coordinates of the file are in an unknown system.",
   "error.import_unsupported": "Use a GeoJSON, KML or DXF file.",
+  "map.tools": "Tools",
 };
 export default en;
