@@ -418,5 +418,10 @@ const en: Record<string, string> = {
   "report.comp.excluded": "left out",
   "relax.used": "Used: {{list}}.",
   "relax.usedTotal": "Used: {{list}} — +{{pct}}% building density in total.",
+  "fin.residentialMarket": "Housing at market price (of {{area}} net in total)",
+  "fin.affordable": "Affordable housing (ΚΟΑΓ), {{area}} buildable × {{price}}",
+  "fin.compensation": "Incentive buy-out (Affordable Housing Fund)",
+  "fin.compensationUnpriced": "The buy-out amount was not priced: no official value of building density found for the area.",
+  "opt.affordable": "of which {{area}} affordable housing at {{price}}",
 };
 export default en;

@@ -198,6 +198,12 @@ export interface RelaxationCost {
   pctOfExcessValue?: number;
   /** affordable_units: share of the EXTRA units to be made available as affordable housing. */
   pctOfExtraUnits?: number;
+  /** affordable_units: share of the PERMITTED (base) floor area to be sold at a fixed price. */
+  affordableShareOfPermitted?: number;
+  /** affordable_units: that fixed price, per m² of buildable floor area. */
+  fixedPricePerM2Buildable?: number;
+  /** compensation: payment = incentive floor area × factor × official value of building density per m². */
+  compensationFactor?: number;
   noteKey?: string;
 }
 

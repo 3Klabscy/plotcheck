@@ -238,7 +238,8 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
     if (p.basementLevels) doc.row(t("fin.basement"), String(p.basementLevels));
     doc.row(t("fin.profitTarget"), fmtPercent(p.targetProfitPctOfGdv, lng));
     doc.space(4);
-    if (fs.areas.residentialNetM2 > 0) doc.row(t("fin.residential", { area: fmtArea(fs.areas.residentialNetM2, lng) }), money(fr.gdvBreakdown.residential));
+    if (fs.areas.residentialNetM2 > 0) doc.row(t(p.affordableBuildableM2 ? "fin.residentialMarket" : "fin.residential", { area: fmtArea(fs.areas.residentialNetM2, lng) }), money(fr.gdvBreakdown.residential));
+    if (fr.gdvBreakdown.affordable > 0) doc.row(t("fin.affordable", { area: fmtArea(p.affordableBuildableM2 ?? 0, lng), price: perM2(p.affordablePricePerM2Buildable ?? 0) }), money(fr.gdvBreakdown.affordable));
     if (fs.areas.commercialNetM2 > 0) doc.row(t("fin.commercial", { area: fmtArea(fs.areas.commercialNetM2, lng) }), money(fr.gdvBreakdown.commercial));
     if (fs.areas.verandaM2 > 0) doc.row(t("fin.verandas", { area: fmtArea(fs.areas.verandaM2, lng) }), money(fr.gdvBreakdown.verandas));
     doc.row(t("fin.gdv"), money(fr.gdv), { strong: true });
@@ -249,6 +250,7 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
     doc.row(t("fin.soft"), money(fr.softBreakdown.design + fr.softBreakdown.permits + fr.softBreakdown.legal));
     doc.row(t("fin.contingency"), money(fr.softBreakdown.contingency));
     doc.row(t("fin.marketing"), money(fr.softBreakdown.marketing));
+    if (fr.softBreakdown.compensation > 0) doc.row(t("fin.compensation"), money(fr.softBreakdown.compensation));
     doc.row(t("fin.financeCost"), money(fr.softBreakdown.finance));
     doc.row(t("fin.devCost"), money(fr.devCost), { strong: true });
     doc.row(t("fin.surplus"), money(fr.surplusBeforeLand), { strong: true });

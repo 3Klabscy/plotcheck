@@ -36,4 +36,17 @@ describe("finance", () => {
     expect(f.rental.grossAnnual).toBe(522 * 12 * 12);
     expect(f.rental.netAnnual).toBe(Math.round(522 * 12 * 12 * 0.8));
   });
+  it("sells the affordable share at the fixed price and the rest at market price", () => {
+    const base = finance(A, P);
+    const f = finance(A, { ...P, affordableBuildableM2: 100, affordablePricePerM2Buildable: 1650 });
+    const net = 100 * (A.residentialNetM2 / A.gfaM2);
+    expect(f.gdvBreakdown.affordable).toBe(165_000);
+    expect(f.gdvBreakdown.residential).toBe(Math.round((A.residentialNetM2 - net) * P.salePricePerM2));
+    expect(f.gdv).toBeLessThan(base.gdv);
+  });
+  it("adds a buy-out payment to the costs", () => {
+    const f = finance(A, { ...P, schemeCompensation: 50_000 });
+    expect(f.softBreakdown.compensation).toBe(50_000);
+    expect(f.devCost).toBeGreaterThan(finance(A, P).devCost + 50_000); // finance cost on top
+  });
 });

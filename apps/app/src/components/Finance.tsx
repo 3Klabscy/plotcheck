@@ -3,7 +3,7 @@ import { Linking, Pressable, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { areasFrom, finance, type AnalysisResult, type FinanceAreas, type FinanceParams, type FinanceResult } from "@plotcheck/engine";
 import type { AnalyseResponse, FinanceDefaults } from "../lib/api";
-import type { PriceChoice } from "../lib/options";
+import { obligationsFor, type PriceChoice } from "../lib/options";
 import { fmtArea, fmtMoney, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, styles } from "./ui";
@@ -102,7 +102,18 @@ function FinanceCard({ fd, data, result, onChange, marketPrice }: { fd: FinanceD
   const verandaM2 = scenario === "relaxed" && relaxed ? relaxed.applied.reduce((s, a) => s + (a.contribution.verandaM2 ?? 0), 0) : 0;
   const areas = areasFrom(src, data.params.netToGross, verandaM2);
 
-  const params: FinanceParams = { ...defaults, salePricePerM2: price, commercialPricePerM2: commercialPrice, constructionCostPerM2: Math.round(cost * fd.finishFactor[finish]), basementLevels: basement, targetProfitPctOfGdv: profitPct / 100, ...(landPrice ? { landPrice } : {}) };
+  const ob = obligationsFor(result, scenario === "relaxed", fd);
+  const params: FinanceParams = {
+    ...defaults,
+    salePricePerM2: price,
+    commercialPricePerM2: commercialPrice,
+    constructionCostPerM2: Math.round(cost * fd.finishFactor[finish]),
+    basementLevels: basement,
+    targetProfitPctOfGdv: profitPct / 100,
+    ...(landPrice ? { landPrice } : {}),
+    ...(ob.affordableBuildableM2 ? { affordableBuildableM2: ob.affordableBuildableM2, affordablePricePerM2Buildable: ob.affordablePricePerM2Buildable! } : {}),
+    ...(ob.schemeCompensation ? { schemeCompensation: ob.schemeCompensation } : {}),
+  };
   const r = finance(areas, params);
   const snapKey = JSON.stringify([scenario, finish, params, areas]);
   useEffect(() => { onChange?.({ use: result.use, scenario, finish, params, areas, result: r, priceSource: { ...source, edited } }); }, [snapKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -160,7 +171,10 @@ function FinanceCard({ fd, data, result, onChange, marketPrice }: { fd: FinanceD
         </View>
 
         <SectionTitle>{t("fin.sales")}</SectionTitle>
-        {areas.residentialNetM2 > 0 && <Row label={t("fin.residential", { area: fmtArea(areas.residentialNetM2, lng) })} value={money(r.gdvBreakdown.residential)} />}
+        {areas.residentialNetM2 > 0 && <Row label={t(ob.affordableBuildableM2 ? "fin.residentialMarket" : "fin.residential", { area: fmtArea(areas.residentialNetM2, lng) })} value={money(r.gdvBreakdown.residential)} />}
+        {r.gdvBreakdown.affordable > 0 && (
+          <Row label={t("fin.affordable", { area: fmtArea(ob.affordableBuildableM2!, lng), price: perM2(ob.affordablePricePerM2Buildable!) })} value={money(r.gdvBreakdown.affordable)} />
+        )}
         {areas.commercialNetM2 > 0 && <Row label={t("fin.commercial", { area: fmtArea(areas.commercialNetM2, lng) })} value={money(r.gdvBreakdown.commercial)} />}
         {areas.verandaM2 > 0 && <Row label={t("fin.verandas", { area: fmtArea(areas.verandaM2, lng) })} value={money(r.gdvBreakdown.verandas)} />}
         <Row label={t("fin.gdv")} value={money(r.gdv)} strong />
@@ -173,6 +187,8 @@ function FinanceCard({ fd, data, result, onChange, marketPrice }: { fd: FinanceD
         <Row label={t("fin.soft")} value={money(r.softBreakdown.design + r.softBreakdown.permits + r.softBreakdown.legal)} />
         <Row label={t("fin.contingency")} value={money(r.softBreakdown.contingency)} />
         <Row label={t("fin.marketing")} value={money(r.softBreakdown.marketing)} />
+        {r.softBreakdown.compensation > 0 && <Row label={t("fin.compensation")} value={money(r.softBreakdown.compensation)} />}
+        {ob.compensationUnpriced && <Text style={styles.small}>{t("fin.compensationUnpriced")}</Text>}
         <Row label={t("fin.financeCost")} value={money(r.softBreakdown.finance)} />
         <Row label={t("fin.devCost")} value={money(r.devCost)} strong />
         <Row label={t("fin.surplus")} value={money(r.surplusBeforeLand)} strong />

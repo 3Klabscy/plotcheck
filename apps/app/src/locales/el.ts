@@ -418,5 +418,10 @@ const el: Record<string, string> = {
   "report.comp.excluded": "εξαιρέθηκε",
   "relax.used": "Χρησιμοποιούνται: {{list}}.",
   "relax.usedTotal": "Χρησιμοποιούνται: {{list}} — σύνολο +{{pct}}% συντελεστή δόμησης.",
+  "fin.residentialMarket": "Κατοικίες σε τιμή αγοράς (από {{area}} καθαρά συνολικά)",
+  "fin.affordable": "Προσιτή κατοικία (ΚΟΑΓ), {{area}} δομήσιμα × {{price}}",
+  "fin.compensation": "Εξαγορά κινήτρου (Ταμείο Προσιτής Στέγης)",
+  "fin.compensationUnpriced": "Το ποσό της εξαγοράς δεν υπολογίστηκε: δεν βρέθηκε επίσημη αξία συντελεστή για την περιοχή.",
+  "opt.affordable": "εκ των οποίων {{area}} προσιτή κατοικία στα {{price}}",
 };
 export default el;

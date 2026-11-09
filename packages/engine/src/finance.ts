@@ -38,6 +38,11 @@ export interface FinanceParams {
   landPurchaseFeeBands: FeeBand[];
   /** Optional known land price: then profit is computed on it. */
   landPrice?: number;
+  /** Floor area (buildable m²) that must be sold at a fixed price, e.g. affordable housing under an incentive scheme. */
+  affordableBuildableM2?: number;
+  affordablePricePerM2Buildable?: number;
+  /** A one-off payment the scheme requires instead (e.g. buying out the incentive), added to the costs. */
+  schemeCompensation?: number;
   /** Long-term rent per m² of sellable area per month (for hold-and-rent investors). */
   rentPerM2Month: number;
   /** Operating costs and voids as a share of gross rent. */
@@ -47,11 +52,11 @@ export interface FinanceParams {
 export interface FinanceResult {
   currency: string;
   gdv: number;
-  gdvBreakdown: { residential: number; commercial: number; verandas: number };
+  gdvBreakdown: { residential: number; affordable: number; commercial: number; verandas: number };
   hardCost: number;
   hardBreakdown: { building: number; verandas: number; basement: number; external: number };
   softCost: number;
-  softBreakdown: { design: number; permits: number; legal: number; contingency: number; marketing: number; finance: number };
+  softBreakdown: { design: number; permits: number; legal: number; contingency: number; marketing: number; finance: number; compensation: number };
   /** Total development cost excluding land. */
   devCost: number;
   /** Sales value minus development cost: what is left to pay for land and profit. */
@@ -93,10 +98,15 @@ export function areasFrom(r: { figures: Figures; units?: UnitEstimate; houses?: 
 }
 
 export function finance(a: FinanceAreas, p: FinanceParams): FinanceResult {
-  const residential = a.residentialNetM2 * p.salePricePerM2;
+  // affordable share: its sellable area leaves the market sales and is sold at the fixed price per buildable m²
+  const affBuildable = Math.max(0, p.affordableBuildableM2 ?? 0);
+  const netRatio = a.gfaM2 > 0 ? a.residentialNetM2 / a.gfaM2 : 0;
+  const affNet = Math.min(a.residentialNetM2, affBuildable * netRatio);
+  const residential = (a.residentialNetM2 - affNet) * p.salePricePerM2;
+  const affordable = affNet > 0 ? affBuildable * (p.affordablePricePerM2Buildable ?? 0) : 0;
   const commercial = a.commercialNetM2 * p.commercialPricePerM2;
   const verandas = a.verandaM2 * p.salePricePerM2 * p.verandaValueShare;
-  const gdv = residential + commercial + verandas;
+  const gdv = residential + affordable + commercial + verandas;
 
   const building = a.gfaM2 * p.constructionCostPerM2;
   const verandaCost = a.verandaM2 * p.constructionCostPerM2 * p.verandaCostShare;
@@ -109,9 +119,10 @@ export function finance(a: FinanceAreas, p: FinanceParams): FinanceResult {
   const legal = hardCost * p.legalPct;
   const contingency = hardCost * p.contingencyPct;
   const marketing = gdv * p.marketingPctOfGdv;
-  const beforeFinance = hardCost + design + permits + legal + contingency + marketing;
+  const compensation = Math.max(0, p.schemeCompensation ?? 0);
+  const beforeFinance = hardCost + design + permits + legal + contingency + marketing + compensation;
   const financeCost = beforeFinance * p.financePct;
-  const softCost = design + permits + legal + contingency + marketing + financeCost;
+  const softCost = design + permits + legal + contingency + marketing + compensation + financeCost;
   const devCost = hardCost + softCost;
   const surplus = gdv - devCost;
 
@@ -139,11 +150,11 @@ export function finance(a: FinanceAreas, p: FinanceParams): FinanceResult {
   return {
     currency: p.currency,
     gdv: r0(gdv),
-    gdvBreakdown: { residential: r0(residential), commercial: r0(commercial), verandas: r0(verandas) },
+    gdvBreakdown: { residential: r0(residential), affordable: r0(affordable), commercial: r0(commercial), verandas: r0(verandas) },
     hardCost: r0(hardCost),
     hardBreakdown: { building: r0(building), verandas: r0(verandaCost), basement: r0(basement), external: r0(external) },
     softCost: r0(softCost),
-    softBreakdown: { design: r0(design), permits: r0(permits), legal: r0(legal), contingency: r0(contingency), marketing: r0(marketing), finance: r0(financeCost) },
+    softBreakdown: { design: r0(design), permits: r0(permits), legal: r0(legal), contingency: r0(contingency), marketing: r0(marketing), finance: r0(financeCost), compensation: r0(compensation) },
     devCost: r0(devCost),
     surplusBeforeLand: r0(surplus),
     residualLandValue: r0(residual),

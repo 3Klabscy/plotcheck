@@ -180,6 +180,9 @@ export function nationalSchemeTier(plotAreaM2: number | undefined, baseFar: numb
   return baseFar >= 1 - 1e-9 ? { pct: 0.45, combinable: false, totalMax: 0.45 } : { pct: 0.25, combinable: true, totalMax: 0.35 };
 }
 
+/** ΚΟΑΓ sale price of affordable units, per m² of buildable floor area (in force from 1/7/2024). */
+export const KOAG_PRICE_PER_M2 = 1650;
+
 const KOAG = src("ΚΟΑΓ — Πολεοδομικά Κίνητρα (Απόφαση Υπουργικού Συμβουλίου 16/4/2025), πίνακας επιλεξιμότητας", "https://cldc.org.cy/en/utilization-of-urban-planning-incentive/urban-incentives/");
 
 function schemeRelaxations(tier: NonNullable<ReturnType<typeof nationalSchemeTier>>): Relaxation[] {
@@ -194,7 +197,13 @@ function schemeRelaxations(tier: NonNullable<ReturnType<typeof nationalSchemeTie
       conditionsKey: "cy.relax.affordable.conditions",
       instrument: `Σχέδιο Παροχής Πολεοδομικών Κινήτρων (Απόφαση Υπουργικού Συμβουλίου 16/4/2025) — +${pct}%`,
       effect: { farPct: tier.pct },
-      cost: { type: "affordable_units", pctOfExtraUnits: tier.pct === 0.45 ? 0.2 / 0.45 : 0.1 / 0.25, noteKey: tier.combinable ? "cy.relax.affordable.cost25" : "cy.relax.affordable.cost45" },
+      cost: {
+        type: "affordable_units",
+        pctOfExtraUnits: tier.pct === 0.45 ? 0.2 / 0.45 : 0.1 / 0.25,
+        affordableShareOfPermitted: tier.pct === 0.45 ? 0.2 : 0.1,
+        fixedPricePerM2Buildable: KOAG_PRICE_PER_M2,
+        noteKey: tier.combinable ? "cy.relax.affordable.cost25" : "cy.relax.affordable.cost45",
+      },
       uses: MULTI_UNIT,
       exclusiveGroup: "cy.national-scheme",
       ...combine,
@@ -210,7 +219,7 @@ function schemeRelaxations(tier: NonNullable<ReturnType<typeof nationalSchemeTie
       conditionsKey: "cy.relax.buyout.conditions",
       instrument: `Σχέδιο Παροχής Πολεοδομικών Κινήτρων — Τρόπος 4, χρηματικό αντιστάθμισμα — +${pct}%`,
       effect: { farPct: tier.pct },
-      cost: { type: "compensation", noteKey: "cy.relax.buyout.cost" },
+      cost: { type: "compensation", compensationFactor: 1.5, noteKey: "cy.relax.buyout.cost" },
       uses: MULTI_UNIT,
       exclusiveGroup: "cy.national-scheme",
       ...combine,

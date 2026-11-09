@@ -52,6 +52,9 @@ export function OptionsCompare({ data, priceFor, selected, onPick }: { data: Ana
               </Text>
               <Line label={t("opt.price")} value={`${money(o.price.perM2)}/m²`} hint={o.price.source === "comparables" ? t("opt.fromComparables", { count: o.price.count ?? 0 }) : t("opt.estimate")} />
               <Line label={t("opt.gdv")} value={money(f.gdv)} strong />
+              {o.obligations.affordableBuildableM2 ? (
+                <Text style={[styles.small, { textAlign: "right" }]}>{t("opt.affordable", { area: fmtArea(o.obligations.affordableBuildableM2, lng), price: `${money(o.obligations.affordablePricePerM2Buildable!)}/m²` })}</Text>
+              ) : null}
               <Line label={t("opt.buildCost")} value={money(f.hardCost)} hint={t("opt.perM2", { value: money(Math.round(f.hardCost / o.gfaM2)) })} />
               <Line label={t("opt.devCost")} value={money(f.devCost)} />
               <Line label={t("opt.residual")} value={money(f.residualLandValue)} strong color={f.residualLandValue > 0 ? colors.allowed : colors.notAllowed} />

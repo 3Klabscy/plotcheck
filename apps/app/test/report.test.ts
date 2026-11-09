@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import i18next from "i18next";
 import { PDFDocument } from "pdf-lib";
 import { areasFrom, comparableStats, finance } from "@plotcheck/engine";
-import { compareOptions } from "../src/lib/options";
+import { compareOptions, obligationsFor } from "../src/lib/options";
 import el from "../src/locales/el";
 import en from "../src/locales/en";
 import cyEl from "../../../packages/countries/cy/src/i18n/el";
@@ -28,7 +28,8 @@ async function build(lng: string, use = "apartment_block", live = false) {
   const d = fx.analysis.finance.byUse[use];
   const src = result.relaxed ?? result;
   const areas = areasFrom(src, fx.analysis.params.netToGross, (result.relaxed?.applied ?? []).reduce((s: number, a: { contribution: { verandaM2?: number } }) => s + (a.contribution.verandaM2 ?? 0), 0));
-  const params = { ...d, landPrice: 300000 };
+  const ob = obligationsFor(result, true, fx.analysis.finance);
+  const params = { ...d, landPrice: 300000, ...(ob.affordableBuildableM2 ? { affordableBuildableM2: ob.affordableBuildableM2, affordablePricePerM2Buildable: ob.affordablePricePerM2Buildable } : {}) };
   const tiles: string[] = [];
   const comps = comparableStats(
     [
@@ -65,6 +66,9 @@ describe("option comparison", () => {
     const apt = options.find((o) => o.use === "apartment_block")!;
     expect(apt.price).toMatchObject({ source: "comparables", perM2: comps.meanPerM2 });
     expect(apt.relaxed).toBe(true);
+    // plot 666 (698 m²): +25% tier → 10% of the permitted 837.6 m² sold to ΚΟΑΓ beneficiaries at €1,650/m²
+    expect(apt.obligations).toMatchObject({ affordableBuildableM2: 84, affordablePricePerM2Buildable: 1650 });
+    expect(apt.finance.gdvBreakdown.affordable).toBe(84 * 1650);
   }, 30_000);
 });
 

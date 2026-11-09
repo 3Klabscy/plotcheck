@@ -99,6 +99,7 @@ streets are not covered yet:
 ## To do
 
 - Affordable-housing scheme: tiers and the 35%/45% totals now follow the ΚΟΑΓ table (decision 16/4/2025). Still to read: the full decision text (cldc.org.cy ΠΑΡΑΡΤΗΜΑ13) for edge cases (net plot area, merged plots) and its validity.
+- Finance: the affordable share (10% / 20% of the permitted floor area) is sold at the ΚΟΑΓ price of €1,650/m² buildable, the rest at market price; if the buy-out is used, its payment (incentive floor area × 1.5 × DLS value of building density, 2021 General Valuation) is a cost.
 - Every relaxation used in the figures is listed in one line under the relaxations headline (screen and PDF), with its share of the density uplift.
 - Read Order 4/2025 itself, including its energy thresholds.
 - Add the incentive chapters of the other Local Plans (Nicosia, Limassol, Paphos, Famagusta)
