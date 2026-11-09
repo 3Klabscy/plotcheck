@@ -128,6 +128,7 @@ const messages: Record<string, string> = {
   "cy.layer.contours": "Contour lines",
   "cy.layer.hillshade": "Hillshade",
   "cy.attribution.dtm": "Digital Terrain Model © DLS Cyprus, CC BY-SA 4.0",
+  "cy.comp.howTo": "Real prices: DLS → eServices → \"Comparable Sales\" (fee applies), or a registered valuer. Import the file you receive here.",
 };
 
 export default messages;

@@ -158,6 +158,32 @@ export class ReportDoc {
     this.y -= h + 8;
   }
 
+  /** A simple table: column widths as shares of the content width; numbers right-aligned from column 2 on. */
+  table(header: string[], rows: string[][], widths: number[], o: { size?: number; boldFirstCol?: boolean; highlightRow?: number; textCols?: number } = {}) {
+    const size = o.size ?? 8.5, pad = 3, lh = size * 1.3;
+    const ws = widths.map((w) => w * this.contentW);
+    const drawRow = (cells: string[], bold: boolean, fill?: RGB) => {
+      const wrapped = cells.map((c, i) => this.wrap(c, size, ws[i]! - 2 * pad, bold || (o.boldFirstCol && i === 0) ? this.bold : this.regular));
+      const h = Math.max(...wrapped.map((w) => w.length)) * lh + 2 * pad;
+      this.ensure(h);
+      if (fill) this.page.drawRectangle({ x: this.margin, y: this.y - h, width: this.contentW, height: h, color: fill });
+      let x = this.margin;
+      wrapped.forEach((lines, i) => {
+        const font = bold || (o.boldFirstCol && i === 0) ? this.bold : this.regular;
+        lines.forEach((l, k) => {
+          const tx = i < (o.textCols ?? 1) ? x + pad : x + ws[i]! - pad - font.widthOfTextAtSize(l, size);
+          this.page.drawText(l, { x: tx, y: this.y - pad - size - k * lh + 1, size, font, color: bold ? C.muted : C.ink });
+        });
+        x += ws[i]!;
+      });
+      this.y -= h;
+      this.page.drawLine({ start: { x: this.margin, y: this.y }, end: { x: A4.w - this.margin, y: this.y }, thickness: 0.3, color: C.line });
+    };
+    drawRow(header, true);
+    rows.forEach((r, i) => drawRow(r, false, i === o.highlightRow ? rgb(0.89, 0.95, 0.925) : undefined));
+    this.y -= 6;
+  }
+
   space(h: number) {
     this.y -= h;
   }

@@ -10,6 +10,7 @@ import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, StatusBadge, styles } from "./ui";
 import { RelaxationsView } from "./Relaxations";
 import { FinanceView, type FinanceSnapshot } from "./Finance";
+import type { PriceChoice } from "../lib/options";
 
 export function UseOptions({ data, onPick, selected }: { data: AnalyseResponse; onPick(u: UseType): void; selected?: UseType }) {
   const { t, i18n } = useTranslation();
@@ -45,7 +46,7 @@ export function UseOptions({ data, onPick, selected }: { data: AnalyseResponse; 
   );
 }
 
-export function ResultView({ data, result, onFinance }: { data: AnalyseResponse; result: AnalysisResult; onFinance?(s: FinanceSnapshot | undefined): void }) {
+export function ResultView({ data, result, onFinance, marketPrice }: { data: AnalyseResponse; result: AnalysisResult; onFinance?(s: FinanceSnapshot | undefined): void; marketPrice?: PriceChoice }) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const f = result.figures;
@@ -132,7 +133,7 @@ export function ResultView({ data, result, onFinance }: { data: AnalyseResponse;
         )}
       </Card>
 
-      <FinanceView data={data} result={result} onChange={onFinance} />
+      <FinanceView data={data} result={result} onChange={onFinance} {...(marketPrice ? { marketPrice } : {})} />
 
       <Card>
         <SectionTitle>{t("result.toBeChecked")}</SectionTitle>

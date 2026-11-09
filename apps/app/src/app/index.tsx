@@ -7,6 +7,11 @@ import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
 import { DrawingsPanel, LayerPanel, MapToolbar, download } from "../components/MapControls";
 import type { FinanceSnapshot } from "../components/Finance";
+import { ComparablesCard, statsFor } from "../components/Comparables";
+import { OptionsCompare } from "../components/OptionsCompare";
+import type { ComparableKind, ComparableSale } from "@plotcheck/engine";
+import { kindForUse } from "../lib/comparables";
+import type { PriceChoice } from "../lib/options";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -49,6 +54,12 @@ export default function Home() {
   const [drawingsOpen, setDrawingsOpen] = useState(false);
   const [financeSnap, setFinanceSnap] = useState<FinanceSnapshot>();
   const [reportBusy, setReportBusy] = useState(false);
+  // comparable sales (session; saved with the account later) and how they are filtered
+  const [comparables, setComparables] = useState<ComparableSale[]>([]);
+  const [compKind, setCompKind] = useState<ComparableKind | "all">();
+  const [compMonths, setCompMonths] = useState(6);
+  const [showComp, setShowComp] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
   const [mode, setMode] = useState<"map" | "details">("map");
   // Deep links: /?ref=<national ref> opens that plot; /?lng=33.615&lat=34.93&z=18 opens the map there.
   const q = useLocalSearchParams<{ lng?: string; lat?: string; z?: string; ref?: string }>();
@@ -238,7 +249,9 @@ export default function Home() {
     try {
       // loaded on demand: pdf-lib and the fonts are only needed here
       const [{ buildReport }, { loadFonts }] = await Promise.all([import("../lib/report/build"), import("../lib/report/fonts")]);
-      const pdf = await buildReport({ t, lng, config, zones, data: analysis, result, ...(financeSnap ? { finance: financeSnap } : {}), fonts: await loadFonts(), generatedAt: new Date() });
+      const comp = statsFor(comparables, compKind ?? kindForUse(result.use), compMonths);
+      const options = (await import("../lib/options")).compareOptions(analysis, { relaxed: true, priceFor });
+      const pdf = await buildReport({ t, lng, config, zones, data: analysis, result, ...(financeSnap ? { finance: financeSnap } : {}), ...(comp ? { comparables: comp } : {}), options, fonts: await loadFonts(), generatedAt: new Date() });
       const name = `plotcheck-${analysis.parcel.nationalRef.replace(/[^\w-]+/g, "_")}-${result.use}.pdf`;
       download(name, "application/pdf", pdf);
     } catch (e) {
@@ -247,6 +260,12 @@ export default function Home() {
     } finally {
       setReportBusy(false);
     }
+  };
+
+  /** Sale price for a use from the comparables of its kind (or the chosen kind), if any. */
+  const priceFor = (u: UseType): PriceChoice | undefined => {
+    const st = statsFor(comparables, compKind ?? kindForUse(u), compMonths);
+    return st ? { perM2: st.meanPerM2, source: "comparables", count: st.used.length } : undefined;
   };
 
   const grid = config?.nationalGrid;
@@ -449,6 +468,36 @@ export default function Home() {
               setStep("result");
             }}
           />
+          {step === "result" && (
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              <View style={{ flex: 1 }}><Button title={`${showComp ? "▾" : "▸"} ${t("comp.short", { count: comparables.length })}`} kind="secondary" onPress={() => setShowComp((x) => !x)} testID="toggle-comp" /></View>
+              <View style={{ flex: 1 }}><Button title={`${showOptions ? "▾" : "▸"} ${t("opt.short")}`} kind="secondary" onPress={() => setShowOptions((x) => !x)} testID="toggle-options" /></View>
+            </View>
+          )}
+          {(step === "build" || showComp) && (
+            <ComparablesCard
+              sales={comparables}
+              onChange={setComparables}
+              kind={compKind ?? kindForUse(use ?? "apartment_block")}
+              onKind={setCompKind}
+              months={compMonths}
+              onMonths={setCompMonths}
+              {...(analysis.finance?.market ? { market: analysis.finance.market } : {})}
+              countryCode={config.code}
+            />
+          )}
+          {(step === "build" || showOptions) && (
+            <OptionsCompare
+              data={analysis}
+              priceFor={priceFor}
+              {...(use ? { selected: use } : {})}
+              onPick={(u) => {
+                setUse(u);
+                setStep("result");
+                setShowOptions(false);
+              }}
+            />
+          )}
         </>
       )}
 
@@ -456,7 +505,7 @@ export default function Home() {
         <>
           <Button title={reportBusy ? t("report.making") : t("report.download")} onPress={makeReport} disabled={reportBusy} testID="report-pdf" />
           <View style={{ height: 12 }} />
-          <ResultView data={analysis} result={result} onFinance={setFinanceSnap} />
+          <ResultView data={analysis} result={result} onFinance={setFinanceSnap} {...((p) => (p ? { marketPrice: p } : {}))(priceFor(result.use))} />
         </>
       )}
 

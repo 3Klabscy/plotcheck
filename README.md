@@ -36,6 +36,13 @@ be built on it. Web only in phase 1, built on the multi-country architecture fro
   finish level, basements and profit target are editable and recompute on the device. The DLS
   General Valuation (1/1/2021) value for the plot's area and zone is shown for comparison. All
   figures are estimates, ex-VAT, with sources listed.
+- **Comparable sales and option comparison.** Import a comparable-sales file (e.g. the DLS
+  "Comparable Sales" export or a valuer's list, CSV/Excel, Greek or English columns) or add sales by
+  hand: the app keeps the last 6 (or 12) months, removes outliers and uses the average price per m²
+  of each kind (apartments, houses, commercial) as the sale price. The district market (DLS open
+  data: number of sales and average value per sale, last 6 months) is shown as context. Every
+  allowed building type is compared side by side: what gets built, sales value, construction cost,
+  total development cost and the land price it can carry.
 - **PDF report.** One click builds an A4 report on the device (Greek or English): the plot,
   an orthophoto map with the plot and the buildable footprint, the planning zone, restrictions,
   what can be built, the relaxations, the finance with the user's own assumptions, the engineer's

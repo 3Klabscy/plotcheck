@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import i18next from "i18next";
 import { PDFDocument } from "pdf-lib";
-import { areasFrom, finance } from "@plotcheck/engine";
+import { areasFrom, comparableStats, finance } from "@plotcheck/engine";
+import { compareOptions } from "../src/lib/options";
 import el from "../src/locales/el";
 import en from "../src/locales/en";
 import cyEl from "../../../packages/countries/cy/src/i18n/el";
@@ -29,14 +30,43 @@ async function build(lng: string, use = "apartment_block", live = false) {
   const areas = areasFrom(src, fx.analysis.params.netToGross, (result.relaxed?.applied ?? []).reduce((s: number, a: { contribution: { verandaM2?: number } }) => s + (a.contribution.verandaM2 ?? 0), 0));
   const params = { ...d, landPrice: 300000 };
   const tiles: string[] = [];
+  const comps = comparableStats(
+    [
+      { date: "2026-10-03", price: 212_500, areaM2: 85, kind: "apartment", label: "Σωτήρος" },
+      { date: "2026-08-20", price: 260_000, areaM2: 100, kind: "apartment", label: "Αγ. Νικόλαος" },
+      { date: "2026-07-01", price: 243_000, areaM2: 90, kind: "apartment" },
+      { date: "2026-06-12", price: 228_000, areaM2: 95, kind: "apartment" },
+      { date: "2026-06-01", price: 700_000, areaM2: 80, kind: "apartment", label: "ρετιρέ με θέα" },
+    ],
+    { asOf: new Date("2026-11-09"), kind: "apartment" },
+  )!;
+  const options = compareOptions(fx.analysis, { relaxed: true, priceFor: (u) => (u === "commercial" ? undefined : { perM2: comps.meanPerM2, source: "comparables", count: comps.used.length }) });
   const pdf = await buildReport({
     t: t as never, lng, config: fx.config, zones: fx.zones, data: fx.analysis, result,
-    finance: { use: use as never, scenario: result.relaxed ? "relaxed" : "base", finish: "standard", params, areas, result: finance(areas, params) },
+    finance: { use: use as never, scenario: result.relaxed ? "relaxed" : "base", finish: "standard", params, areas, result: finance(areas, params), priceSource: { perM2: params.salePricePerM2, source: "comparables", count: 2, edited: false } },
+    comparables: comps, options,
     fonts, generatedAt: new Date("2026-11-09T18:30:00Z"),
     ...(live ? {} : { fetchBytes: async (u: string) => { tiles.push(u); return undefined; } }),
   });
-  return { pdf, tiles };
+  return { pdf, tiles, options, comps };
 }
+
+describe("option comparison", () => {
+  it("lists every allowed use with sales value, construction cost and land value, best first", async () => {
+    const { options, comps } = await build("el");
+    expect(comps.excluded).toHaveLength(1); // the €8,750/m² penthouse
+    expect(options.map((o) => o.use)).not.toContain(undefined);
+    for (const o of options) {
+      expect(o.finance.gdv).toBeGreaterThan(0);
+      expect(o.finance.hardCost).toBeGreaterThan(0);
+    }
+    const sorted = [...options].sort((a, b) => b.finance.residualLandValue - a.finance.residualLandValue);
+    expect(options.map((o) => o.use)).toEqual(sorted.map((o) => o.use));
+    const apt = options.find((o) => o.use === "apartment_block")!;
+    expect(apt.price).toMatchObject({ source: "comparables", perM2: comps.meanPerM2 });
+    expect(apt.relaxed).toBe(true);
+  }, 30_000);
+});
 
 describe("PDF report", () => {
   it("builds a Greek report with the map tiles of the plot's area", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Parcel, ZoneHit } from "@plotcheck/core";
 import { finance } from "@plotcheck/engine";
-import { cyFinanceDefaults, officialLandValue } from "../src/index.ts";
+import { cyFinanceDefaults, cyMarketStats, officialLandValue } from "../src/index.ts";
 
 const parcel = (municipalityCode: string, quarter: string | undefined, area: number) =>
   ({ identifiers: { municipalityCode, ...(quarter ? { quarter } : {}) }, officialAreaM2: area }) as unknown as Parcel;
@@ -42,5 +42,19 @@ describe("DLS General Valuation 2021", () => {
     const v = officialLandValue(parcel("4000", undefined, 700), zone("Κα4"))!;
     expect(v.areaKey).toBe("ΛΑΡΝΑΚΑ");
     expect(v.perM2Buildable).toBe(233);
+  });
+});
+
+describe("district market (DLS open data)", () => {
+  it("summarises the last 6 months with data for the plot's district", () => {
+    const m = cyMarketStats(parcel("4000", "03", 700))!;
+    expect(m.area).toBe("ΛΑΡΝΑΚΑ");
+    expect(m.monthly).toHaveLength(6);
+    expect(m.sales).toBe(m.monthly.reduce((a, x) => a + x.sales, 0));
+    expect(m.avgValuePerSale).toBeGreaterThan(50_000);
+    expect(m.source.url).toContain("data.gov.cy");
+  });
+  it("is part of the finance defaults", () => {
+    expect(cyFinanceDefaults(parcel("4000", "03", 700), undefined).market?.area).toBe("ΛΑΡΝΑΚΑ");
   });
 });

@@ -18,6 +18,7 @@
 - **Noto Sans** (Regular, Bold), `apps/app/assets/fonts/`: © The Noto Project Authors, SIL Open
   Font License 1.1 (`apps/app/assets/fonts/OFL.txt`). Embedded (subset) in the PDF reports.
 - **pdf-lib** and **@pdf-lib/fontkit**: MIT licence. PDF report generation on the device.
+- **read-excel-file**: MIT licence. Reading comparable-sales Excel files.
 
 ## Data
 
@@ -29,6 +30,9 @@
   redistributed; the tile index (`packages/countries/cy/data/cy-dtm-index.json`, built by
   `tools/build_cy_dtm_index.py`) is derived from the DLS index and shared under CC BY-SA 4.0.
   Attribution: "Ψηφιακό Μοντέλο Εδάφους © Τμήμα Κτηματολογίου και Χωρομετρίας, CC BY-SA 4.0".
+- District sales statistics (`packages/countries/cy/data/cy-sales-stats.json`, built by
+  `tools/build_cy_market_stats.py`): DLS "Στατιστικά Πωλήσεων - Μεταβιβάσεων Ακινήτων",
+  data.gov.cy, **CC BY 4.0**.
 - Larnaca plan-street geometry (`packages/countries/cy/src/larnaca/streets.ts`): © OpenStreetMap
   contributors, ODbL 1.0 — the extract is shared under the same licence.
 - Larnaca road names (`packages/countries/cy/data/larnaca-roads-dls.json`): road geometry from the

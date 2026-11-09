@@ -3,3 +3,4 @@ export * from "./analyse.ts";
 export * from "./scenarios.ts";
 export * from "./relax.ts";
 export * from "./finance.ts";
+export * from "./comparables.ts";

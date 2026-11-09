@@ -3,6 +3,7 @@ import { Linking, Pressable, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { areasFrom, finance, type AnalysisResult, type FinanceAreas, type FinanceParams, type FinanceResult } from "@plotcheck/engine";
 import type { AnalyseResponse, FinanceDefaults } from "../lib/api";
+import type { PriceChoice } from "../lib/options";
 import { fmtArea, fmtMoney, fmtNumber, fmtPercent } from "../lib/format";
 import { colors } from "../theme";
 import { Card, Notice, Row, SectionTitle, styles } from "./ui";
@@ -62,26 +63,34 @@ export interface FinanceSnapshot {
   params: FinanceParams;
   areas: FinanceAreas;
   result: FinanceResult;
+  /** Where the sale price came from (comparables or the module's estimate) and whether the user changed it. */
+  priceSource: PriceChoice & { edited: boolean };
 }
 
 /** Financial feasibility: estimates from the country module, adjustable and recomputed on the device. */
-export function FinanceView({ data, result, onChange }: { data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot | undefined): void }) {
+export function FinanceView({ data, result, onChange, marketPrice }: { data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot | undefined): void; marketPrice?: PriceChoice }) {
   const fd = data.finance;
   const show = !!fd && result.status !== "not_allowed" && result.figures.achievableGfaM2 > 0;
   useEffect(() => { if (!show) onChange?.(undefined); }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!show) return null;
-  return <FinanceCard key={`${data.parcel.nationalRef}-${result.use}`} fd={fd} data={data} result={result} onChange={onChange} />;
+  // a new comparables average restarts the card from it
+  return <FinanceCard key={`${data.parcel.nationalRef}-${result.use}-${marketPrice?.perM2 ?? "est"}`} fd={fd} data={data} result={result} onChange={onChange} {...(marketPrice ? { marketPrice } : {})} />;
 }
 
-function FinanceCard({ fd, data, result, onChange }: { fd: FinanceDefaults; data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot): void }) {
+function FinanceCard({ fd, data, result, onChange, marketPrice }: { fd: FinanceDefaults; data: AnalyseResponse; result: AnalysisResult; onChange?(s: FinanceSnapshot): void; marketPrice?: PriceChoice }) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const defaults = fd.byUse[result.use];
   const relaxed = result.relaxed && result.relaxed.gain.gfaM2 > 0.5 ? result.relaxed : undefined;
 
   const [scenario, setScenario] = useState<Scenario>(relaxed ? "relaxed" : "base");
-  const [price, setPrice] = useState(defaults.salePricePerM2);
-  const [commercialPrice, setCommercialPrice] = useState(defaults.commercialPricePerM2);
+  const isCommercial = result.use === "commercial";
+  const startPrice = !isCommercial && marketPrice ? marketPrice.perM2 : defaults.salePricePerM2;
+  const startCommercial = isCommercial && marketPrice ? marketPrice.perM2 : defaults.commercialPricePerM2;
+  const [price, setPrice] = useState(startPrice);
+  const [commercialPrice, setCommercialPrice] = useState(startCommercial);
+  const source: PriceChoice = marketPrice ?? { perM2: isCommercial ? defaults.commercialPricePerM2 : defaults.salePricePerM2, source: "estimate" };
+  const edited = isCommercial ? commercialPrice !== startCommercial : price !== startPrice;
   const [cost, setCost] = useState(defaults.constructionCostPerM2);
   const [finish, setFinish] = useState<Finish>("standard");
   const [basement, setBasement] = useState(defaults.basementLevels);
@@ -96,7 +105,7 @@ function FinanceCard({ fd, data, result, onChange }: { fd: FinanceDefaults; data
   const params: FinanceParams = { ...defaults, salePricePerM2: price, commercialPricePerM2: commercialPrice, constructionCostPerM2: Math.round(cost * fd.finishFactor[finish]), basementLevels: basement, targetProfitPctOfGdv: profitPct / 100, ...(landPrice ? { landPrice } : {}) };
   const r = finance(areas, params);
   const snapKey = JSON.stringify([scenario, finish, params, areas]);
-  useEffect(() => { onChange?.({ use: result.use, scenario, finish, params, areas, result: r }); }, [snapKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onChange?.({ use: result.use, scenario, finish, params, areas, result: r, priceSource: { ...source, edited } }); }, [snapKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (n: number) => fmtMoney(n, lng, r.currency);
   const perM2 = (n: number) => `${money(n)}/m²`;
@@ -124,6 +133,9 @@ function FinanceCard({ fd, data, result, onChange }: { fd: FinanceDefaults; data
         <SectionTitle>{t("fin.assumptions")}</SectionTitle>
         {areas.residentialNetM2 > 0 && <Stepper label={t("fin.salePrice")} value={price} onChange={setPrice} step={100} min={500} format={perM2} testID="fin-price" />}
         {areas.commercialNetM2 > 0 && <Stepper label={t("fin.commercialPrice")} value={commercialPrice} onChange={setCommercialPrice} step={100} min={500} format={perM2} testID="fin-cprice" />}
+        <Text testID="fin-price-source" style={[styles.small, { marginTop: -2, marginBottom: 4 }]}>
+          {edited ? t("fin.priceEdited") : source.source === "comparables" ? t("fin.priceFromComparables", { count: source.count ?? 0 }) : t("fin.priceEstimate")}
+        </Text>
         <Stepper label={t("fin.buildCost")} value={cost} onChange={setCost} step={50} min={300} format={perM2} testID="fin-cost" />
         <Segment<Finish>
           label={t("fin.finish")}

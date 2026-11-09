@@ -138,6 +138,23 @@ export interface LegalTexts {
 
 export type FeatureFlag = "docScan" | "plotIdSearch" | "restrictions" | "financials" | "brokering" | "ads";
 
+/** Property market of the plot's area from official statistics (activity and average value per sale). */
+export interface MarketStats {
+  area: string;
+  /** First and last month with data, YYYY-MM. */
+  from: string;
+  to: string;
+  sales: number;
+  plots: number;
+  totalValue: number;
+  avgValuePerSale: number;
+  /** Change of the average value per sale against the same months a year before (0.05 = +5%). */
+  changeVsYearBefore?: number;
+  salesYearBefore?: number;
+  monthly: { month: string; sales: number; avgValue: number }[];
+  source: { label: string; url: string };
+}
+
 export interface FinanceDefaults {
   /** Default financial parameters per building type (engine FinanceParams shape). */
   byUse: Record<UseType, import("@plotcheck/engine").FinanceParams>;
@@ -145,6 +162,8 @@ export interface FinanceDefaults {
   officialLandValue?: { perM2Buildable: number; perM2BuildableGround: number; far: number; total: number; areaKey: string; date: string; source: { label: string; url: string } };
   sources: { label: string; url: string }[];
   notes: string[];
+  /** Market activity in the plot's area (official statistics), as context for the sale price. */
+  market?: MarketStats;
 }
 
 export interface CountryModule {

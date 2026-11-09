@@ -67,5 +67,6 @@ export { cyContours, contourLines, chooseInterval } from "./dls/contours.ts";
 export { cyPlotStructures } from "./site.ts";
 export * from "./restrictions.ts";
 export { cyFinanceDefaults, officialLandValue } from "./finance.ts";
+export { cyMarketStats } from "./market.ts";
 export { parseCadastralParcels, parseFeatureInfo } from "./dls/gml.ts";
 export { mapZoneAttributes, samplePoints, toZoneHit } from "./dls/zones.ts";

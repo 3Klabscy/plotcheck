@@ -3,6 +3,7 @@ import type { FinanceParams } from "@plotcheck/engine";
 import type { FinanceDefaults } from "@plotcheck/country-sdk";
 import landValues from "../data/larnaca-land-values-2021.json" with { type: "json" };
 import plotIndex from "../data/larnaca-plot-index.json" with { type: "json" };
+import { cyMarketStats } from "./market.ts";
 
 /**
  * Cyprus / Larnaca financial defaults (2026-11). Every figure is an ESTIMATE, editable in the app
@@ -110,6 +111,7 @@ export function cyFinanceDefaults(parcel: Parcel, zone: ZoneHit | undefined): Fi
     byUse,
     finishFactor: FINISH_FACTOR,
     ...(zone ? { officialLandValue: officialLandValue(parcel, zone) } : {}),
+    ...((m) => (m ? { market: m } : {}))(cyMarketStats(parcel)),
     sources: SOURCES,
     notes: ["prices_ex_vat", "estimates"],
   };

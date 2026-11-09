@@ -91,12 +91,27 @@ export interface AnalyseResponse {
   disclaimerKey: string;
 }
 
+export interface MarketStats {
+  area: string;
+  from: string;
+  to: string;
+  sales: number;
+  plots: number;
+  totalValue: number;
+  avgValuePerSale: number;
+  changeVsYearBefore?: number;
+  salesYearBefore?: number;
+  monthly: { month: string; sales: number; avgValue: number }[];
+  source: { label: string; url: string };
+}
+
 export interface FinanceDefaults {
   byUse: Record<UseType, FinanceParams>;
   finishFactor: Record<"basic" | "standard" | "high", number>;
   officialLandValue?: { perM2Buildable: number; perM2BuildableGround: number; far: number; total: number; areaKey: string; date: string; source: { label: string; url: string } };
   sources: { label: string; url: string }[];
   notes: string[];
+  market?: MarketStats;
 }
 
 export class ApiError extends Error {

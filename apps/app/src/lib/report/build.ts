@@ -3,7 +3,8 @@
 // assumptions. Country-agnostic: labels come from i18n, country specifics from the API's data.
 import type { TFunction } from "i18next";
 import { toGrid } from "@plotcheck/core";
-import type { AnalysisResult } from "@plotcheck/engine";
+import type { AnalysisResult, ComparableStats } from "@plotcheck/engine";
+import type { OptionRow } from "../options";
 import type { AnalyseResponse, CountryConfig, ZonesResponse } from "../api";
 import type { FinanceSnapshot } from "../../components/Finance";
 import { fmtArea, fmtMoney, fmtNumber, fmtPercent } from "../format";
@@ -19,6 +20,10 @@ export interface ReportInput {
   data: AnalyseResponse;
   result: AnalysisResult;
   finance?: FinanceSnapshot;
+  /** Comparable sales behind the sale price (last N months). */
+  comparables?: ComparableStats;
+  /** All allowed building types side by side. */
+  options?: OptionRow[];
   fonts: Fonts;
   generatedAt: Date;
   /** Injected in tests (offline); defaults to fetch. */
@@ -131,6 +136,28 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
     });
   }
 
+  // ---------- options ----------
+  const money0 = (n: number) => fmtMoney(n, lng);
+  if (i.options && i.options.length > 1) {
+    doc.heading(t("opt.title"));
+    doc.text(t("opt.intro"), { size: 8.5, color: C.muted });
+    doc.table(
+      [t("report.opt.use"), t("report.opt.what"), t("opt.price"), t("opt.gdv"), t("opt.buildCost"), t("opt.residual")],
+      i.options.map((o) => [
+        `${t(`use.${o.use}`)}${o.relaxed ? " *" : ""}`,
+        `${o.units !== undefined ? t("opt.units", { count: o.units }) : o.houses !== undefined ? t("opt.houses", { count: o.houses }) : t("opt.space")} · ${fmtArea(o.gfaM2, lng)}`,
+        `${money0(o.price.perM2)}/m²`,
+        money0(o.finance.gdv),
+        money0(o.finance.hardCost),
+        money0(o.finance.residualLandValue),
+      ]),
+      [0.2, 0.22, 0.13, 0.15, 0.15, 0.15],
+      { boldFirstCol: true, textCols: 2, highlightRow: i.options.findIndex((o) => o.use === result.use) },
+    );
+    if (i.options.some((o) => o.relaxed)) doc.text(`* ${t("report.opt.relaxedNote")}`, { size: 7.5, color: C.muted, gapAfter: 0 });
+    doc.text(t("opt.note", { profit: fmtNumber((data.finance?.byUse[result.use].targetProfitPctOfGdv ?? 0) * 100, lng) }), { size: 7.5, color: C.muted });
+  }
+
   // ---------- result ----------
   doc.heading(`${t("report.section.result")} — ${t(`use.${result.use}`)}`);
   if (result.checks.length) {
@@ -203,6 +230,7 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
     doc.text(t("report.finAssumptions"), { size: 9, bold: true, gapAfter: 1 });
     doc.row(t("fin.scenario"), t(`fin.scenario.${fs.scenario}`));
     if (fs.areas.residentialNetM2 > 0) doc.row(t("fin.salePrice"), perM2(p.salePricePerM2));
+    doc.text(fs.priceSource.edited ? t("fin.priceEdited") : fs.priceSource.source === "comparables" ? t("fin.priceFromComparables", { count: fs.priceSource.count ?? 0 }) : t("fin.priceEstimate"), { size: 8, color: C.muted, gapAfter: 2 });
     if (fs.areas.commercialNetM2 > 0) doc.row(t("fin.commercialPrice"), perM2(p.commercialPricePerM2));
     doc.row(`${t("fin.buildCost")} · ${t(`fin.finish.${fs.finish}`)}`, perM2(p.constructionCostPerM2));
     if (p.basementLevels) doc.row(t("fin.basement"), String(p.basementLevels));
@@ -243,6 +271,38 @@ export async function buildReport(i: ReportInput): Promise<Uint8Array> {
     for (const n of data.finance?.notes ?? []) doc.text(`• ${t(`fin.note.${n}`)}`, { size: 8, color: C.muted, gapAfter: 0 });
     doc.space(2);
     for (const s of data.finance?.sources ?? []) doc.text(`${s.label} — ${s.url}`, { size: 7, color: C.muted, gapAfter: 0 });
+  }
+
+  // ---------- comparables & market ----------
+  const cs = i.comparables;
+  const market = data.finance?.market;
+  if (cs || market) {
+    doc.heading(t("comp.title", { months: cs?.months ?? 6 }));
+    if (cs) {
+      doc.text(t("comp.average", { value: `${money0(cs.meanPerM2)}/m²` }), { size: 10, bold: true, gapAfter: 0 });
+      doc.text(t("comp.detail", { median: `${money0(cs.medianPerM2)}/m²`, min: money0(cs.minPerM2), max: money0(cs.maxPerM2), count: cs.used.length, from: cs.from, to: cs.to }), { size: 8.5 });
+      if (cs.excluded.length) doc.text(t("comp.excluded", { count: cs.excluded.length }), { size: 8, color: C.muted });
+      doc.table(
+        [t("comp.f.date"), t("report.comp.what"), t("comp.f.area"), t("comp.f.price"), "€/m²"],
+        [...cs.used, ...cs.excluded].sort((a, b) => b.date.localeCompare(a.date)).map((x) => [
+          x.date,
+          `${t(`comp.kind.${x.kind}`)}${x.label ? ` · ${x.label}` : ""}${cs.excluded.includes(x) ? ` (${t("report.comp.excluded")})` : ""}`,
+          fmtArea(x.areaM2, lng),
+          money0(x.price),
+          money0(x.price / x.areaM2),
+        ]),
+        [0.14, 0.44, 0.12, 0.16, 0.14],
+        { textCols: 2 },
+      );
+    } else doc.text(t("comp.none"), { size: 8.5, color: C.muted });
+    if (market) {
+      doc.text(t("comp.market.title", { area: market.area, from: market.from, to: market.to }), { size: 9, bold: true, gapAfter: 0 });
+      doc.text(
+        `${t("comp.market.line", { sales: fmtNumber(market.sales, lng), avg: money0(market.avgValuePerSale) })}${market.changeVsYearBefore !== undefined ? ` ${t("comp.market.change", { pct: `${market.changeVsYearBefore >= 0 ? "+" : ""}${fmtPercent(market.changeVsYearBefore, lng)}` })}` : ""}`,
+        { size: 8.5, gapAfter: 0 },
+      );
+      doc.text(`${t("comp.market.note")} ${market.source.label} — ${market.source.url}`, { size: 7.5, color: C.muted });
+    }
   }
 
   // ---------- engineer / unverified ----------

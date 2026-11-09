@@ -128,6 +128,7 @@ const messages: Record<string, string> = {
   "cy.layer.contours": "Ισοϋψείς",
   "cy.layer.hillshade": "Σκίαση ανάγλυφου",
   "cy.attribution.dtm": "Ψηφιακό Μοντέλο Εδάφους © ΤΚΧ, CC BY-SA 4.0",
+  "cy.comp.howTo": "Πραγματικές τιμές: ΤΚΧ → Ηλεκτρονικές Υπηρεσίες → «Παροχή Συγκριτικών Πωλήσεων» (με τέλος), ή από εγγεγραμμένο εκτιμητή. Εισάγετε το αρχείο που θα λάβετε εδώ.",
 };
 
 export default messages;
