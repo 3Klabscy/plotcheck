@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<FeatureInfoResponse xmlns:esri_wms="http://www.esri.com/wms" xmlns="http://www.esri.com/wms">
+<FIELDS PlanningZoneName="ΑΛ" PlanningZoneTypeCode="2396" PlanningZoneDescription="ΑΛΥΚΗ" Coverage="Null" Density="Null" Height="Null" AllowedStories="Null" ParentZone="Null" Remarks="Null" Unspecified="Null" PlanningZoneCategoryCode="23" PlanningZoneCategoryDescription="Null" DevelopmentPlanCode="1" DevelopmentPlanCompositeCode="401" DevelopmentPlanNumber="1" DevelopmentPlanDescription="ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ" DevelopmentPlanTypeCode="ΤΟΠΙΚΟ ΣΧΕΔΙΟ" DevelopmentTypeDescription="Null" DistrictCode="4 LARNAKA" DLOFIDNumber="14988086" DLOFileNumber="Null" QAPolygon="No Error" UserName="PANTESAV" CreatedDate="2/2/2007" LastEditedUserName="JOAN6865" LastEditedDate="9/13/2022 6:20:05 AM" GlobalID="{CE9CA07B-1BBE-495F-A423-6127C0B3E7B3}" ObjectID="5026" Shape="Polygon" SHAPE.STArea="4732331.485984" SHAPE.STLength="16431.573656"></FIELDS>
+</FeatureInfoResponse>

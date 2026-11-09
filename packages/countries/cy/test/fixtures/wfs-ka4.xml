@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<wfs:FeatureCollection timeStamp="2026-11-09T15:11:32.94+01:00" numberReturned="6" numberMatched="unknown" xmlns:base33="http://inspire.ec.europa.eu/schemas/base/3.3" xmlns:base2="http://inspire.ec.europa.eu/schemas/base2/1.0" xmlns="http://www.interactive-instruments.de/a4i/1.0" xmlns:gco="http://www.isotc211.org/2005/gco" xmlns:gmd="http://www.isotc211.org/2005/gmd" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:swe="http://www.opengis.net/swe/2.0" xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ad="urn:x-inspire:specification:gmlas:Addresses:3.0" xmlns:au="urn:x-inspire:specification:gmlas:AdministrativeUnits:3.0" xmlns:tn-a="urn:x-inspire:specification:gmlas:AirTransportNetwork:3.0" xmlns:base="urn:x-inspire:specification:gmlas:BaseTypes:3.2" xmlns:bgr="urn:x-inspire:specification:gmlas:BiogeographicalRegions:0.0" xmlns:bui="urn:x-inspire:specification:gmlas:Buildings:0.0" xmlns:tn-c="urn:x-inspire:specification:gmlas:CableTransportNetwork:3.0" xmlns:cp="urn:x-inspire:specification:gmlas:CadastralParcels:3.0" xmlns:tn="urn:x-inspire:specification:gmlas:CommonTransportElements:3.0" xmlns:er="urn:x-inspire:specification:gmlas:EnergyResources:0.0" xmlns:gn="urn:x-inspire:specification:gmlas:GeographicalNames:3.0" xmlns:geo="urn:x-inspire:specification:gmlas:Geology:0.0" xmlns:hb="urn:x-inspire:specification:gmlas:HabitatsAndBiotopes:0.0" xmlns:hy="urn:x-inspire:specification:gmlas:HydroBase:3.0" xmlns:hy-n="urn:x-inspire:specification:gmlas:HydroNetwork:3.0" xmlns:hy-p="urn:x-inspire:specification:gmlas:HydroPhysicalWaters:3.0" xmlns:lc="urn:x-inspire:specification:gmlas:LandCover:0.0" xmlns:nrz="urn:x-inspire:specification:gmlas:NaturalRiskZones:0.0" xmlns:net="urn:x-inspire:specification:gmlas:Network:3.2" xmlns:ps="urn:x-inspire:specification:gmlas:ProtectedSites:3.0" xmlns:ps-f="urn:x-inspire:specification:gmlas:ProtectedSitesFull:3.0" xmlns:tn-ra="urn:x-inspire:specification:gmlas:RailwayTransportNetwork:3.0" xmlns:tn-ro="urn:x-inspire:specification:gmlas:RoadTransportNetwork:3.0" xmlns:sr="urn:x-inspire:specification:gmlas:SeaRegions:0.0" xmlns:sd="urn:x-inspire:specification:gmlas:SpeciesDistribution:0.0" xmlns:stat="urn:x-inspire:specification:gmlas:StatisticalUnits:0.0" xmlns:ugs="urn:x-inspire:specification:gmlas:UtilityAndGovernmentalServices:0.0" xmlns:wfd="urn:x-inspire:specification:gmlas:WaterFrameworkDirective:0.0" xmlns:tn-w="urn:x-inspire:specification:gmlas:WaterTransportNetwork:3.0" xsi:schemaLocation="http://www.interactive-instruments.de/a4i/1.0 https://eservices.dls.moi.gov.cy/inspire/rest/directories/arcgisforinspire/schema/INSPIRE/A4I-10.3.xsd http://www.opengis.net/gml/3.2 https://eservices.dls.moi.gov.cy/inspire/rest/directories/arcgisforinspire/schema/ogc/gml/3.2.1/gml.xsd http://www.opengis.net/wfs/2.0 https://eservices.dls.moi.gov.cy/inspire/rest/directories/arcgisforinspire/schema/ogc/wfs/2.0/wfs.xsd">
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646182">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646182</gml:identifier>
+<cp:areaValue uom="Square meters">698.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646182.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.930168172000 33.615149606000 34.930134354000 33.615358071000 34.930079550000 33.615253560000 34.930019905000 33.615139817000 34.930005141000 33.615111662000 34.930004425000 33.615110296000 34.929962917000 33.615031132000 34.929902903000 33.614916695000 34.930060093000 33.614799872000 34.930163806000 33.615074567000 34.930170874000 33.615106639000 34.930168172000 33.615149606000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646182</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>666</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-666</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646182.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.930059583000 33.615043680000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646183">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646183</gml:identifier>
+<cp:areaValue uom="Square meters">674.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646183.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.929902903000 33.614916695000 34.929848672000 33.614813275000 34.929793617000 33.614708285000 34.929730649000 33.614588205000 34.929686026000 33.614503112000 34.929796434000 33.614515774000 34.929830285000 33.614524073000 34.929854376000 33.614543269000 34.929949473000 33.614642725000 34.930011229000 33.614720523000 34.930060093000 33.614799872000 34.929902903000 33.614916695000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646183</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>667</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-667</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646183.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.929879917000 33.614700240000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646185">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646185</gml:identifier>
+<cp:areaValue uom="Square meters">260.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646185.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.929723253000 33.615050211000 34.929670898000 33.614946281000 34.929695362000 33.614927971000 34.929750760000 33.614886542000 34.929779872000 33.614864759000 34.929826187000 33.614830102000 34.929848672000 33.614813275000 34.929902903000 33.614916695000 34.929723253000 33.615050211000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646185</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>1287</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-1287</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646185.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.929786562000 33.614931624000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646217">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646217</gml:identifier>
+<cp:areaValue uom="Square meters">584.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646217.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.930124496000 33.615418808000 34.930123863000 33.615430282000 34.930121270000 33.615441477000 34.930116795000 33.615452062000 34.930110569000 33.615461721000 34.930102779000 33.615470169000 34.930093655000 33.615477154000 34.930083467000 33.615482471000 34.930072518000 33.615485960000 34.930061133000 33.615487519000 34.930049649000 33.615487101000 34.930038407000 33.615484719000 34.930027740000 33.615480443000 34.930017966000 33.615474400000 34.929982765000 33.615450413000 34.929945124000 33.615422094000 34.929923487000 33.615391907000 34.929903384000 33.615363861000 34.929846892000 33.615271089000 34.929924778000 33.615211994000 34.929950488000 33.615192485000 34.929967555000 33.615179536000 34.930019905000 33.615139817000 34.930079550000 33.615253560000 34.930134354000 33.615358071000 34.930124496000 33.615418808000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646217</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>664</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-664</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646217.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.930005451000 33.615325547000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646440">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646440</gml:identifier>
+<cp:areaValue uom="Square meters">278.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646440.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.929939452000 33.615047221000 34.929937339000 33.615048669000 34.929881164000 33.615087186000 34.929876255000 33.615090552000 34.929873671000 33.615092324000 34.929866440000 33.615097281000 34.929862170000 33.615100209000 34.929859298000 33.615102179000 34.929814580000 33.615132836000 34.929812641000 33.615134167000 34.929807801000 33.615137486000 34.929782006000 33.615155170000 34.929723253000 33.615050211000 34.929902903000 33.614916695000 34.929962917000 33.615031132000 34.929939452000 33.615047221000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646440</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>1341</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-1341</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646440.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.929843718000 33.615037429000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+<wfs:member>
+<cp:CadastralParcel gml:id="cpParcelS.646550">
+<gml:identifier codeSpace="http://inspire.jrc.ec.europa.eu/ids">https://eservices.dls.moi.gov.cy/inspire/rest/services/INSPIRE/CP_CadastralParcels/MapServer/exts/InspireFeatureDownload/service?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=GetFeature&amp;STOREDQUERY_ID=urn:ogc:def:query:OGC-WFS::GetFeatureById&amp;id=cpParcelS.646550</gml:identifier>
+<cp:areaValue uom="Square meters">280.000000</cp:areaValue>
+<cp:beginLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:endLifespanVersion xsi:nil="true" nilReason="unknown"/>
+<cp:geometry>
+<gml:Polygon gml:id="cpParcelS.IFCID.646550.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:exterior>
+<gml:LinearRing>
+<gml:posList>34.929967555000 33.615179536000 34.929950488000 33.615192485000 34.929924778000 33.615211994000 34.929846892000 33.615271089000 34.929782006000 33.615155170000 34.929807801000 33.615137486000 34.929812641000 33.615134167000 34.929814580000 33.615132836000 34.929859298000 33.615102179000 34.929862170000 33.615100209000 34.929866440000 33.615097281000 34.929873671000 33.615092324000 34.929876255000 33.615090552000 34.929881164000 33.615087186000 34.929937339000 33.615048669000 34.929939452000 33.615047221000 34.929962917000 33.615031132000 34.930004425000 33.615110296000 34.930005141000 33.615111662000 34.930019905000 33.615139817000 34.929967555000 33.615179536000</gml:posList>
+</gml:LinearRing>
+</gml:exterior>
+</gml:Polygon>
+</cp:geometry>
+<cp:inspireId>
+<base:Identifier>
+<base:localId>CY.0001-DLS.CP.S.646550</base:localId>
+<base:namespace>CY.0001-DLS.CP</base:namespace>
+<base:versionId xsi:nil="true" nilReason="unknown"/>
+</base:Identifier>
+</cp:inspireId>
+<cp:label>1342</cp:label>
+<cp:nationalCadastralReference>4000-40/56W1-3-1-1342</cp:nationalCadastralReference>
+<cp:referencePoint>
+<gml:Point gml:id="cpParcelS_refPoint.OBJECTID.646550.SHAPE.Geom_0" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+<gml:pos>34.929901628000 33.615150032000</gml:pos>
+</gml:Point>
+</cp:referencePoint>
+<cp:validFrom xsi:nil="true" nilReason="unknown"/>
+<cp:validTo xsi:nil="true" nilReason="unknown"/>
+</cp:CadastralParcel>
+</wfs:member>
+</wfs:FeatureCollection>

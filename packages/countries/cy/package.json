@@ -1,0 +1,16 @@
+{
+  "name": "@plotcheck/country-cy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@turf/bbox": "^7.4.0",
+    "@turf/boolean-point-in-polygon": "^7.4.0",
+    "@turf/point-on-feature": "^7.4.0",
+    "@turf/point-to-polygon-distance": "^7.4.0",
+    "@types/geojson": "^7946.0.16",
+    "fast-xml-parser": "^4.5.7"
+  }
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<FeatureInfoResponse xmlns:esri_wms="http://www.esri.com/wms" xmlns="http://www.esri.com/wms">
+<FIELDS PlanningZoneName="Κα4" PlanningZoneTypeCode="1262" PlanningZoneDescription="ΠΕΡΙΟΧΕΣ ΜΕ ΕΠΙΚΡΑΤΟΥΣΑ ΧΡΗΣΗ ΤΗΝ ΚΑΤΟΙΚΙΑ" Coverage="0.5" Density="1.2" Height="13.5" AllowedStories="3" ParentZone="Null" Remarks="Null" Unspecified="Null" PlanningZoneCategoryCode="29" PlanningZoneCategoryDescription="Null" DevelopmentPlanCode="1" DevelopmentPlanCompositeCode="401" DevelopmentPlanNumber="1" DevelopmentPlanDescription="ΤΟΠΙΚΟ ΣΧΕΔΙΟ ΛΑΡΝΑΚΑΣ" DevelopmentPlanTypeCode="ΤΟΠΙΚΟ ΣΧΕΔΙΟ" DevelopmentTypeDescription="Null" DistrictCode="4 LARNAKA" DLOFIDNumber="14988086" DLOFileNumber="Null" QAPolygon="No Error" UserName="PANTESAV" CreatedDate="2/2/2007" LastEditedUserName="JOAN6865" LastEditedDate="9/13/2022 6:20:05 AM" GlobalID="{D8528C8E-EFA4-41AE-AEC5-CED63C7AD382}" ObjectID="4377" Shape="Polygon" SHAPE.STArea="2618369.268013" SHAPE.STLength="15030.184667"></FIELDS>
+</FeatureInfoResponse>

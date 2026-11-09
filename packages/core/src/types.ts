@@ -1,0 +1,149 @@
+// Country-agnostic domain types. Nothing in this file may reference a specific country.
+
+export type LngLat = { lng: number; lat: number };
+
+/** GeoJSON geometry, always WGS84 (EPSG:4326) lon/lat order once inside our system. */
+export type PolygonGeometry =
+  | { type: "Polygon"; coordinates: number[][][] }
+  | { type: "MultiPolygon"; coordinates: number[][][][] };
+
+export type CurrencyCode = "EUR" | "PLN" | "CZK" | "SEK" | "HUF" | "RON" | "DKK" | (string & {});
+
+export type ReviewStatus = "verified" | "needs_review";
+
+/** Where a value came from. Attached to every rule, parcel and restriction value. */
+export interface Provenance {
+  source: string; // human-readable source name, e.g. "DLS INSPIRE LU planning zones"
+  sourceRef?: string; // URL, dataset id or document reference
+  page?: string; // page / article in a planning document
+  fetchedAt?: string; // ISO timestamp when we read it
+  sourceUpdatedAt?: string; // when the source says it was last edited
+  status: ReviewStatus;
+  verifiedBy?: string; // registered architect/engineer id or name
+}
+
+/** Building types the user can ask about. Shared vocabulary across countries. */
+export type UseType = "apartment_block" | "house" | "row_houses" | "commercial" | "mixed_use";
+export const USE_TYPES: UseType[] = ["apartment_block", "house", "row_houses", "commercial", "mixed_use"];
+
+/** Country-specific plot identifier, fields defined by the country's PlotIdSchema. */
+export type PlotIdentifier = Record<string, string>;
+
+export interface AdminUnitRef {
+  level: number; // 1 = country, increasing = smaller
+  code: string;
+  name?: string;
+}
+
+export interface Parcel {
+  countryCode: string;
+  providerId: string;
+  /** Stable id inside the provider (used for caching / dedupe). */
+  providerParcelId: string;
+  nationalRef: string;
+  label?: string; // what the user calls it, e.g. plot number
+  identifiers: PlotIdentifier;
+  geometry: PolygonGeometry;
+  officialAreaM2?: number;
+  adminUnits: AdminUnitRef[];
+  provenance: Provenance;
+  /** Distance from the queried point (0 = point is inside). Set by getByPoint. */
+  distanceM?: number;
+}
+
+export interface Jurisdiction {
+  /** Path from country downward, e.g. ["CY", "CY-4", "4000"]. */
+  path: string[];
+  names?: Record<string, string>;
+}
+
+export interface ZoneHit {
+  zoneCode: string;
+  zoneName?: string;
+  description?: string;
+  planName?: string;
+  planRef?: string;
+  jurisdiction: Jurisdiction;
+  /** Approximate share of the parcel in this zone (0..1), from point sampling. */
+  share: number;
+  /** Raw coefficients as published by the source, mapped to OZFS-EU constraint names. */
+  publishedConstraints: Partial<Record<ConstraintName, number>>;
+  provenance: Provenance;
+}
+
+// ---------- Rules (OZFS-EU) ----------
+
+/**
+ * Constraint names follow OZFS Appendix A where a term exists (far, lot_cov_bldg, stories,
+ * height, lot_area, lot_width, setback_*, total_units, unit_size). Extensions for European
+ * planning terms are prefixed with nothing but documented here:
+ *  - parking_per_unit: parking spaces required per dwelling unit
+ *  - parking_per_100m2_commercial: spaces per 100 m² of commercial floor area
+ *  - lot_cov_bldg is a FRACTION (0..1), not a percentage
+ * Units are metric (m, m²). OZFS uses feet; we deliberately diverge (metric-only product).
+ */
+export type ConstraintName =
+  | "far"
+  | "lot_cov_bldg"
+  | "stories"
+  | "height"
+  | "lot_area"
+  | "lot_width"
+  | "setback_front"
+  | "setback_side_int"
+  | "setback_rear"
+  | "setback_dist_boundary"
+  | "total_units"
+  | "unit_size"
+  | "parking_per_unit"
+  | "parking_per_100m2_commercial";
+
+/** OZFS value entry: an expression (number or Python-syntax string), optionally conditional. */
+export interface ConstraintValue {
+  expression: number | string | (number | string)[];
+  /** Python-syntax logical expression, `true`, or free text (unencodable -> engine says "maybe"). */
+  condition?: string | boolean;
+  /** When expression is a list: which of the evaluated values applies. */
+  min_max?: "min" | "max";
+}
+
+export interface Constraint {
+  min_val?: ConstraintValue[];
+  max_val?: ConstraintValue[];
+  notes?: string;
+  provenance: Provenance;
+}
+
+export interface Bonus {
+  id: string;
+  description: string;
+  /** Additional FAR (absolute, e.g. 0.1) when the bonus applies. */
+  farAdd?: number;
+  condition?: string;
+  provenance: Provenance;
+}
+
+export interface ZoneRuleSet {
+  schema: "ozfs-eu/0.1";
+  jurisdiction: Jurisdiction;
+  dist_abbr: string; // zone code, e.g. "Κα4"
+  dist_name?: string;
+  plan?: { name: string; ref?: string };
+  /** null = unknown (engine returns "maybe"); [] = nothing allowed. */
+  uses_allowed: { value: UseType[] | null; provenance: Provenance };
+  /** Uses permitted only under conditions (engine returns "maybe"). */
+  uses_conditional?: UseType[];
+  constraints: Partial<Record<ConstraintName, Constraint>>;
+  bonuses: Bonus[];
+  provisions: { text: string; provenance: Provenance }[];
+  /** True when a human-curated record exists for this zone (vs. source data only). */
+  curated: boolean;
+  updatedAt: string;
+}
+
+/** A partial rule set used at one level of the jurisdiction hierarchy (country, region, plan, zone). */
+export type RuleLayer = {
+  level: "country" | "region" | "municipality" | "plan" | "zone" | "source";
+  /** path = jurisdiction prefix; plan = plan reference (a zone code can repeat across plans). */
+  match: { path?: string[]; plan?: string; dist_abbr?: string; dist_prefix?: string };
+} & Partial<Omit<ZoneRuleSet, "schema" | "jurisdiction" | "dist_abbr">>;

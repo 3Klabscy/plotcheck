@@ -1,0 +1,13 @@
+{
+  "name": "@plotcheck/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@turf/area": "^7.4.0",
+    "@turf/buffer": "^7.4.0",
+    "@types/geojson": "^7946.0.16"
+  }
+}

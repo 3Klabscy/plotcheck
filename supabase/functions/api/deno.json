@@ -1,0 +1,17 @@
+{
+  "imports": {
+    "@plotcheck/core": "../../../packages/core/src/index.ts",
+    "@plotcheck/engine": "../../../packages/engine/src/index.ts",
+    "@plotcheck/country-sdk": "../../../packages/country-sdk/src/index.ts",
+    "@plotcheck/api": "../../../packages/api/src/index.ts",
+    "@plotcheck/country-cy": "../../../packages/countries/cy/src/index.ts",
+    "@turf/area": "npm:@turf/area@7.4.0",
+    "@turf/buffer": "npm:@turf/buffer@7.4.0",
+    "@turf/bbox": "npm:@turf/bbox@7.4.0",
+    "@turf/boolean-point-in-polygon": "npm:@turf/boolean-point-in-polygon@7.4.0",
+    "@turf/point-on-feature": "npm:@turf/point-on-feature@7.4.0",
+    "@turf/point-to-polygon-distance": "npm:@turf/point-to-polygon-distance@7.4.0",
+    "fast-xml-parser": "npm:fast-xml-parser@4.5.7",
+    "geojson": "npm:@types/geojson@7946.0.16"
+  }
+}
