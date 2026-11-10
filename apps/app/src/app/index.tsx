@@ -5,7 +5,9 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
-import { DrawingsPanel, LayerPanel, MapFabs, MapToolbar, download, type MapPanel } from "../components/MapControls";
+import { BottomSheet, DrawingsPanel, LayerPanel, MapFabs, MapToolbar, download, type MapPanel } from "../components/MapControls";
+import { DockAware, SheetDockProvider } from "../components/SheetDock";
+import { toRoot } from "../lib/portal";
 import type { FinanceSnapshot } from "../components/Finance";
 import { ComparablesCard, statsFor } from "../components/Comparables";
 import { OptionsCompare } from "../components/OptionsCompare";
@@ -443,11 +445,11 @@ export default function Home() {
     />
   );
 
-  const panel = (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+  const panelBody = (
+    <>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <View style={{ flexShrink: 1 }}>
-          <Text style={styles.h1}>{t("app.name")}</Text>
+          {wide && <Text style={styles.h1}>{t("app.name")}</Text>}
           <Text style={styles.muted}>{t("app.tagline")}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
@@ -709,6 +711,11 @@ export default function Home() {
         />
       )}
       <Text style={[styles.small, { marginTop: 16 }]}>{config.legal.attributionKeys.map((k) => t(k)).join(" · ")}</Text>
+    </>
+  );
+  const panel = (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+      {panelBody}
     </ScrollView>
   );
 
@@ -770,7 +777,8 @@ export default function Home() {
           return o ? t(o.titleKey) : "";
         };
         return (
-          <View testID="stats-banner" pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 76, bottom: 10, zIndex: 9, alignItems: "flex-start" }}>
+          <DockAware key="stats">{(inset) => (
+          <View testID="stats-banner" pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 76, bottom: 10 + inset, zIndex: 9, alignItems: "flex-start" }}>
             <View style={{ backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: wide ? 10 : 8, borderWidth: 1, borderColor: colors.accent, maxWidth: 420 }}>
               {!wide && <Text style={{ fontSize: 12, color: colors.ink, fontWeight: "600", marginBottom: 2 }}>{t("map.statsTap")}</Text>}
               {infoLayer.choices && (
@@ -796,6 +804,7 @@ export default function Home() {
               </View>
             </View>
           </View>
+          )}</DockAware>
         );
       })()}
       {show3d && selected && <Terrain3D country={config.code} parcel={selected} onClose={() => setShow3d(false)} />}
@@ -835,9 +844,24 @@ export default function Home() {
       <View style={{ width: 460, borderLeftWidth: 1, borderColor: colors.line }}>{panel}</View>
     </View>
   ) : (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ height: "48%" }}>{map}</View>
-      <View style={{ flex: 1, borderTopWidth: 1, borderColor: colors.line }}>{panel}</View>
-    </View>
+    // phones: the map takes the whole screen; the app's panel is a sheet that can be pulled down
+    // to a bar (with the map's own panels stacked above it as bars)
+    <SheetDockProvider>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={{ flex: 1 }}>{map}</View>
+        {toRoot(
+          <BottomSheet id="main" testID="main-sheet" modal={false} raiseOn={selected?.nationalRef} maxFrac={0.55}
+            header={
+              <View style={{ paddingLeft: 16, paddingRight: 16, paddingBottom: 8, minHeight: 40, justifyContent: "center" }}>
+                <Text style={{ fontSize: 17, fontWeight: "800", color: colors.ink }} numberOfLines={1}>
+                  {t("app.name")}{selected ? ` · ${t("plot.title", { label: selected.label ?? "" })}` : ""}
+                </Text>
+              </View>
+            }>
+            <View style={{ paddingTop: 4 }}>{panelBody}</View>
+          </BottomSheet>,
+        )}
+      </View>
+    </SheetDockProvider>
   );
 }

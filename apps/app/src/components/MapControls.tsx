@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toRoot } from "../lib/portal";
 import { LayerLegend } from "./AreaStats";
+import { PEEK, useDockedSheet, useDockInset } from "./SheetDock";
 import { Animated, Linking, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
 import { toGrid, type NationalGrid, type Parcel } from "@plotcheck/core";
@@ -40,7 +41,6 @@ const fixed = (Platform.OS === "web" ? { position: "fixed" } : { position: "abso
 export function Sheet({ title, onClose, testID, closeTestID, children, footer, wideStyle }: { title: string; onClose(): void; testID: string; closeTestID?: string; children: ReactNode; footer?: ReactNode; wideStyle?: ViewStyle }) {
   const { t } = useTranslation();
   const compact = useCompact();
-  const { height } = useWindowDimensions();
   const header = (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingLeft: 16, paddingRight: 6, paddingTop: compact ? 8 : 6, paddingBottom: 4 }}>
       <Text style={{ fontSize: compact ? 18 : 15, fontWeight: "700", color: colors.ink }}>{title}</Text>
@@ -58,67 +58,70 @@ export function Sheet({ title, onClose, testID, closeTestID, children, footer, w
         {footer}
       </View>
     );
-  return <>{toRoot(<BottomSheet title={title} header={header} testID={testID} maxHeight={Math.round(height * 0.85)} footer={footer}>{children}</BottomSheet>)}</>;
+  return <>{toRoot(<BottomSheet id={testID} header={header} testID={testID} footer={footer}>{children}</BottomSheet>)}</>;
 }
-
-/** Height left showing when a sheet is pulled down: the handle and the title bar. */
-const PEEK = 74;
 
 /**
  * Phone panel that can be pulled down out of the way (the map stays usable) and pulled back up,
- * keeping everything as it was. Drag the title bar, or drag the list down when it is at the top;
- * tap the lowered bar or the dimmed map to switch between the two. ✕ closes it.
+ * keeping everything as it was. Lowered panels become bars stacked at the bottom of the screen
+ * (see SheetDock); raising one lowers the one that was up. Drag the title bar, or pull the list
+ * down when it is at the top; tap a bar to raise it; tap the dimmed map to lower a raised panel.
  */
-function BottomSheet({ title, header, testID, maxHeight, footer, children }: { title: string; header: ReactNode; testID: string; maxHeight: number; footer?: ReactNode; children: ReactNode }) {
+export function BottomSheet({ id, header, testID, footer, children, initialDown = false, modal = true, barExtra, raiseOn, maxFrac }: { id: string; header: ReactNode; testID: string; footer?: ReactNode; children: ReactNode; initialDown?: boolean; modal?: boolean; barExtra?: ReactNode; raiseOn?: unknown; maxFrac?: number }) {
   const { t } = useTranslation();
-  const [down, setDown] = useState(false);
-  const [h, setH] = useState(0);
+  const dock = useDockedSheet(id, initialDown, maxFrac);
+  const { down } = dock;
   const y = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(0);
-  const state = useRef({ down: false, h: 0 });
-  state.current = { down, h };
-  const travel = () => Math.max(0, state.current.h - PEEK);
+  const h = useRef(0);
+  const live = useRef(dock);
+  live.current = dock;
   const snap = (toDown: boolean) => {
-    setDown(toDown);
-    Animated.spring(y, { toValue: toDown ? travel() : 0, useNativeDriver: false, bounciness: 2, speed: 18 }).start();
+    y.setValue(0);
+    live.current.setDown(toDown);
   };
-  // keep the lowered position right when the sheet's height changes (e.g. a group opened)
-  useEffect(() => { if (down) y.setValue(travel()); }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
+  // raise when something worth seeing arrives (e.g. a plot was picked on the map)
+  const firstRaise = useRef(true);
+  useEffect(() => {
+    if (firstRaise.current) { firstRaise.current = false; return; }
+    if (raiseOn !== undefined && raiseOn !== null && raiseOn !== false) live.current.setDown(false);
+  }, [raiseOn]);
   const responder = () =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
       onPanResponderMove: (_e, g) => {
-        const start = state.current.down ? travel() : 0;
-        y.setValue(Math.min(travel(), Math.max(0, start + g.dy)));
+        if (!live.current.down) y.setValue(Math.min(Math.max(0, h.current - PEEK), Math.max(0, g.dy)));
       },
       onPanResponderRelease: (_e, g) => {
-        if (state.current.down) snap(!(g.dy < -40 || g.vy < -0.4));
-        else snap(g.dy > 80 || g.vy > 0.5);
+        if (live.current.down) { if (g.dy < -30 || g.vy < -0.4) snap(false); }
+        else if (g.dy > 80 || g.vy > 0.5) snap(true);
+        else Animated.spring(y, { toValue: 0, useNativeDriver: false, bounciness: 2, speed: 18 }).start();
       },
-      onPanResponderTerminate: () => snap(state.current.down),
+      onPanResponderTerminate: () => y.setValue(0),
     });
   const headerPan = useMemo(() => responder(), []); // eslint-disable-line react-hooks/exhaustive-deps
-  // the list scrolls natively in the browser: pulling it down while it is at the top lowers the sheet
+  // the list scrolls natively in the browser: pulling it down while it is at the top lowers the panel
   const listRef = useRef<unknown>(null);
   useEffect(() => {
-    const el = listRef.current as unknown as HTMLElement | null;
+    const el = listRef.current as HTMLElement | null;
     if (Platform.OS !== "web" || !el?.addEventListener) return;
     let y0 = 0, t0 = 0, active = false, last = 0;
     const start = (e: TouchEvent) => { y0 = e.touches[0]!.clientY; t0 = Date.now(); active = false; last = 0; };
     const move = (e: TouchEvent) => {
-      if (state.current.down) return;
+      if (live.current.down) return;
       const dy = e.touches[0]!.clientY - y0;
       if (!active && dy > 10 && scrollY.current <= 0) active = true;
       if (!active) return;
       e.preventDefault();
       last = dy;
-      y.setValue(Math.min(travel(), Math.max(0, dy)));
+      y.setValue(Math.min(Math.max(0, h.current - PEEK), Math.max(0, dy)));
     };
     const end = () => {
       if (!active) return;
       active = false;
       const v = last / Math.max(1, Date.now() - t0);
-      snap(last > 80 || v > 0.5);
+      if (last > 80 || v > 0.5) snap(true);
+      else Animated.spring(y, { toValue: 0, useNativeDriver: false, bounciness: 2, speed: 18 }).start();
     };
     el.addEventListener("touchstart", start, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
@@ -132,28 +135,42 @@ function BottomSheet({ title, header, testID, maxHeight, footer, children }: { t
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <View pointerEvents="box-none" style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, zIndex: 1000, justifyContent: "flex-end" }]}>
-      {!down && <Pressable style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.25)" }]} onPress={() => snap(true)} accessibilityLabel={t("map.sheetDown")} testID={`${testID}-backdrop`} />}
-      <Animated.View testID={testID} onLayout={(e) => setH(e.nativeEvent.layout.height)}
-        style={{ backgroundColor: colors.panel, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight, paddingBottom: 12, ...shadow, transform: [{ translateY: y }] }}>
+    <>
+      {modal && !down && (
+        <Pressable style={[fixed, { left: 0, right: 0, top: 0, bottom: dock.bottom, zIndex: 999, backgroundColor: "rgba(0,0,0,0.22)" }]} onPress={() => snap(true)} accessibilityLabel={t("map.sheetDown")} testID={`${testID}-backdrop`} />
+      )}
+      <Animated.View testID={testID}
+        onLayout={(e) => { if (!down) { h.current = e.nativeEvent.layout.height; dock.setHeight(h.current); } }}
+        style={[fixed, {
+          left: 0, right: 0, bottom: dock.bottom, zIndex: down ? 1001 : 1000,
+          backgroundColor: colors.panel, borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden",
+          ...(down ? { height: PEEK, borderTopWidth: 1, borderColor: colors.line } : { maxHeight: dock.maxHeight }),
+          paddingBottom: down ? 0 : 12, ...shadow, transform: [{ translateY: y }],
+        }]}>
         <View {...headerPan.panHandlers}>
           <Pressable onPress={() => snap(!down)} accessibilityRole="button" accessibilityLabel={down ? t("map.sheetUp") : t("map.sheetDown")} testID={`${testID}-handle`}
-            style={{ alignItems: "center", paddingTop: 8, paddingBottom: 2 }}>
+            style={{ alignItems: "center", paddingTop: 7, paddingBottom: 1 }}>
             <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
           </Pressable>
           {header}
-          {down && <Text style={{ position: "absolute", right: 64, top: 34, fontSize: 13, color: colors.accent, fontWeight: "700" }} accessibilityLabel={title}>▲ {t("map.sheetUp")}</Text>}
+          {/* a lowered bar: tapping it (anywhere but the close button) raises the panel */}
+          {down && <Pressable onPress={() => snap(false)} testID={`${testID}-bar`} accessibilityLabel={t("map.sheetUp")} style={{ position: "absolute", left: 0, top: 0, bottom: 0, right: 60 }} />}
+          {down && (
+            <View pointerEvents="none" style={{ position: "absolute", right: 64, top: 24, flexDirection: "row", alignItems: "center", gap: 6 }}>
+              {barExtra}
+              <Text style={{ fontSize: 13, color: colors.accent, fontWeight: "700" }}>▲ {t("map.sheetUp")}</Text>
+            </View>
+          )}
         </View>
         <View ref={listRef as never} style={{ flexShrink: 1 }}>
-          <ScrollView style={{ paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 8 }} scrollEventThrottle={16}
+          <ScrollView style={{ paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 8 }} scrollEventThrottle={16} keyboardShouldPersistTaps="handled"
             onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}>{children}</ScrollView>
         </View>
         {footer}
       </Animated.View>
-    </View>
+    </>
   );
 }
-
 
 const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "water", "environment", "infrastructure", "admin", "statistics"];
 
@@ -307,6 +324,7 @@ export function MapFabs({ onZoomIn, onZoomOut, onLocate }: { onZoomIn(): void; o
   const { t } = useTranslation();
   const compact = useCompact();
   const size = compact ? 52 : 42;
+  const inset = useDockInset();
   const fab = (label: string, a11y: string, onPress: () => void, testID: string) => (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress}
       style={({ pressed }) => [{ width: size, height: size, borderRadius: size / 2, backgroundColor: "rgba(255,255,255,0.97)", alignItems: "center", justifyContent: "center", ...shadow }, pressed && { backgroundColor: colors.allowedBg }]}>
@@ -314,7 +332,7 @@ export function MapFabs({ onZoomIn, onZoomOut, onLocate }: { onZoomIn(): void; o
     </Pressable>
   );
   return (
-    <View style={{ position: "absolute", right: 12, bottom: compact ? 44 : 36, gap: 10, alignItems: "center", zIndex: 10 }} pointerEvents="box-none">
+    <View style={{ position: "absolute", right: 12, bottom: (compact ? 44 : 36) + inset, gap: 10, alignItems: "center", zIndex: 10 }} pointerEvents="box-none">
       {onLocate && fab("◎", t("btn.locate"), onLocate, "fab-locate")}
       {fab("+", t("map.zoomInBtn"), onZoomIn, "fab-zoom-in")}
       {fab("−", t("map.zoomOutBtn"), onZoomOut, "fab-zoom-out")}
@@ -366,6 +384,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const compact = useCompact();
+  const dockInset = useDockInset();
   const [copied, setCopied] = useState(false);
   const [findText, setFindText] = useState("");
   const [findMsg, setFindMsg] = useState<string>();
@@ -485,7 +504,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
       )}
 
       {measure !== "none" && (
-        <View testID="measure-box" style={{ position: "absolute", left: 8, bottom: compact ? 8 : 28, right: compact ? 76 : undefined, maxWidth: compact ? undefined : 320, backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: compact ? 9 : 12, minWidth: compact ? undefined : 240, borderWidth: 1, borderColor: "#7B2FF7", zIndex: 10, ...shadow }}>
+        <View testID="measure-box" style={{ position: "absolute", left: 8, bottom: (compact ? 8 : 28) + dockInset, right: compact ? 76 : undefined, maxWidth: compact ? undefined : 320, backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: compact ? 9 : 12, minWidth: compact ? undefined : 240, borderWidth: 1, borderColor: "#7B2FF7", zIndex: 10, ...shadow }}>
           {!compact && <Text style={{ fontSize: 11, fontWeight: "700", color: "#7B2FF7", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{t(`map.tool.${measure}`)}</Text>}
           {measure === "point" ? (
             result ? (
