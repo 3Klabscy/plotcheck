@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { PlotMapHandle, PlotMapProps } from "./PlotMap.types";
 
 export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(_props, ref) {
-  useImperativeHandle(ref, () => ({ flyTo: () => undefined, fitBounds: () => undefined }));
+  useImperativeHandle(ref, () => ({ flyTo: () => undefined, fitBounds: () => undefined, zoomIn: () => undefined, zoomOut: () => undefined }));
   return (
     <View style={styles.box}>
       <Text>Map is available on the web version in phase 1.</Text>

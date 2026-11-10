@@ -5,7 +5,7 @@ import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
 import { PlotMap } from "../components/PlotMap";
 import { PlotSearch } from "../components/PlotSearch";
-import { DrawingsPanel, LayerPanel, MapToolbar, download } from "../components/MapControls";
+import { DrawingsPanel, LayerPanel, MapFabs, MapToolbar, download, type MapPanel } from "../components/MapControls";
 import type { FinanceSnapshot } from "../components/Finance";
 import { ComparablesCard, statsFor } from "../components/Comparables";
 import { OptionsCompare } from "../components/OptionsCompare";
@@ -48,14 +48,13 @@ export default function Home() {
   const [use, setUse] = useState<UseType>();
   const [basemap, setBasemap] = useState<string>();
   const [overlays, setOverlays] = useState<string[]>();
-  const [layersOpen, setLayersOpen] = useState(false);
+  const [mapPanel, setMapPanel] = useState<MapPanel>(null);
   const [measure, setMeasure] = useState<MeasureTool>("none");
   const [measureReset, setMeasureReset] = useState(0);
   const [measured, setMeasured] = useState<MeasureResult | null>(null);
   const [candidates, setCandidates] = useState(false);
   const view = useRef<{ lng: number; lat: number; zoom: number; bbox: [number, number, number, number] } | undefined>(undefined);
   const [drawings, setDrawings] = useState<UserCollection>({ type: "FeatureCollection", features: [] });
-  const [drawingsOpen, setDrawingsOpen] = useState(false);
   const [financeSnap, setFinanceSnap] = useState<FinanceSnapshot>();
   const [reportBusy, setReportBusy] = useState(false);
   // comparable sales (session; saved with the account later) and how they are filtered
@@ -253,7 +252,7 @@ export default function Home() {
       try {
         const fs = importFile(file.name, await file.text(), config?.nationalGrid);
         setDrawings((d) => ({ ...d, features: [...d.features, ...fs] }));
-        setDrawingsOpen(true);
+        setMapPanel("drawings");
         setError(null);
         fitFeatures(fs);
       } catch (e) {
@@ -677,39 +676,38 @@ export default function Home() {
       />
       <MapToolbar
         measure={measure}
-        onMeasure={(m) => { setMeasure(m); setLayersOpen(false); }}
+        onMeasure={(m) => { setMeasure(m); setMapPanel(null); }}
         onClear={() => setMeasureReset((n) => n + 1)}
         result={measured}
         plot={step !== "tap" ? selected : undefined}
         shareUrl={shareUrl}
-        layersOpen={layersOpen}
-        onLayers={() => { setLayersOpen((o) => !o); setDrawingsOpen(false); }}
+        panel={mapPanel}
+        setPanel={setMapPanel}
         grid={grid}
         onImport={importDrawings}
         drawingsCount={drawings.features.length}
-        drawingsOpen={drawingsOpen}
-        onDrawings={() => { setDrawingsOpen((o) => !o); setLayersOpen(false); }}
         onSaveMeasure={saveMeasure}
         onFindInView={findInView}
       />
-      {drawingsOpen && drawings.features.length > 0 && (
+      <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
+      {mapPanel === "drawings" && drawings.features.length > 0 && (
         <DrawingsPanel
           drawings={drawings}
           grid={grid}
           onDelete={(id) => setDrawings((d) => ({ ...d, features: d.features.filter((f) => f.id !== id) }))}
-          onClearAll={() => { setDrawings({ type: "FeatureCollection", features: [] }); setDrawingsOpen(false); }}
+          onClearAll={() => { setDrawings({ type: "FeatureCollection", features: [] }); setMapPanel(null); }}
           onZoom={(f) => fitFeatures([f])}
-          onClose={() => setDrawingsOpen(false)}
+          onClose={() => setMapPanel(null)}
         />
       )}
-      {layersOpen && (
+      {mapPanel === "layers" && (
         <LayerPanel
           layers={config.mapLayers}
           basemap={basemap ?? "streets"}
           overlays={overlays ?? []}
           onBasemap={setBasemap}
           onToggle={(id) => setOverlays((o) => ((o ?? []).includes(id) ? (o ?? []).filter((x) => x !== id) : [...(o ?? []), id]))}
-          onClose={() => setLayersOpen(false)}
+          onClose={() => setMapPanel(null)}
         />
       )}
     </View>

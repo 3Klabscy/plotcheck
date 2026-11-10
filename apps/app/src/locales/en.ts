@@ -466,5 +466,7 @@ const en: Record<string, string> = {
   "error.sign_in_required": "Sign in first.",
   "error.provider_unavailable": "This payment method is not available.",
   "error.unknown_plan": "Plan not found.",
+  "map.zoomInBtn": "Zoom in",
+  "map.zoomOutBtn": "Zoom out",
 };
 export default en;

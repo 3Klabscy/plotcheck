@@ -59,6 +59,8 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
   useImperativeHandle(ref, () => ({
     flyTo: (p, zoom = 18) => map.current?.flyTo({ center: [p.lng, p.lat], zoom, speed: 1.6 }),
     fitBounds: (b) => map.current?.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom: 18, duration: 600 }),
+    zoomIn: () => map.current?.zoomIn({ duration: 250 }),
+    zoomOut: () => map.current?.zoomOut({ duration: 250 }),
   }));
   const measurePts = useRef<[number, number][]>([]);
   const cursorBox = useRef<HTMLDivElement | null>(null);
@@ -106,7 +108,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       maxZoom: 20,
       attributionControl: { compact: true },
     });
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // zoom buttons are the app's own big floating buttons (MapFabs); pinch and double-tap still zoom
     m.on("load", () => {
       m.addSource("neighbours", { type: "geojson", data: fc([]) });
       m.addSource("selected", { type: "geojson", data: fc([]) });

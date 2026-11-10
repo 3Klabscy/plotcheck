@@ -36,4 +36,6 @@ export interface PlotMapProps {
 export interface PlotMapHandle {
   flyTo(p: { lng: number; lat: number }, zoom?: number): void;
   fitBounds(b: [number, number, number, number]): void;
+  zoomIn(): void;
+  zoomOut(): void;
 }

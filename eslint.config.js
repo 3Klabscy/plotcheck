@@ -3,7 +3,7 @@
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "apps/app/**", "supabase/**", "**/dist/**"] },
+  { ignores: ["**/node_modules/**", "apps/app/**", "supabase/**", "**/dist/**", "deploy/dist-web/**", "deploy/netlify/**", "dist-web/**"] },
   ...tseslint.configs.recommended,
   {
     files: ["packages/core/src/**", "packages/engine/src/**", "packages/country-sdk/src/**", "packages/api/src/**"],

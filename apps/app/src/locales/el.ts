@@ -466,5 +466,7 @@ const el: Record<string, string> = {
   "error.sign_in_required": "Συνδεθείτε πρώτα.",
   "error.provider_unavailable": "Αυτός ο τρόπος πληρωμής δεν είναι διαθέσιμος.",
   "error.unknown_plan": "Το πακέτο δεν βρέθηκε.",
+  "map.zoomInBtn": "Μεγέθυνση",
+  "map.zoomOutBtn": "Σμίκρυνση",
 };
 export default el;

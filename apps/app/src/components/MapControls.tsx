@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { useState, type ReactNode } from "react";
+import { toRoot } from "../lib/portal";
+import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { NationalGrid, Parcel } from "@plotcheck/core";
 import { allPositions, feature, toDxf, toGeoJson, toKml, type UserCollection, type UserFeature } from "../lib/userLayer";
@@ -8,70 +9,117 @@ import { fmtArea, fmtNumber } from "../lib/format";
 import { colors } from "../theme";
 import type { MeasureResult, MeasureTool } from "./PlotMap.types";
 
-const chip = (on: boolean) => ({
-  backgroundColor: on ? colors.ink : "rgba(255,255,255,0.94)",
-  paddingHorizontal: 9,
-  paddingVertical: 6,
-  borderRadius: 8,
-  shadowColor: "#000",
-  shadowOpacity: 0.12,
-  shadowRadius: 3,
-  shadowOffset: { width: 0, height: 1 },
+/** One map panel open at a time. */
+export type MapPanel = "layers" | "tools" | "find" | "export" | "drawings" | null;
+
+/** Phones and narrow windows: bigger touch targets, panels as bottom sheets. */
+export function useCompact() {
+  const { width } = useWindowDimensions();
+  return width < 700;
+}
+
+const shadow = { shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } };
+const chip = (on: boolean, compact: boolean) => ({
+  backgroundColor: on ? colors.ink : "rgba(255,255,255,0.96)",
+  paddingHorizontal: compact ? 14 : 10,
+  paddingVertical: compact ? 11 : 7,
+  minHeight: compact ? 44 : 32,
+  justifyContent: "center" as const,
+  borderRadius: compact ? 12 : 8,
+  ...shadow,
 });
-const chipText = (on: boolean) => ({ color: on ? "#fff" : colors.ink, fontSize: 12, fontWeight: "600" as const });
+const chipText = (on: boolean, compact: boolean) => ({ color: on ? "#fff" : colors.ink, fontSize: compact ? 15 : 13, fontWeight: "700" as const });
+
+const fixed = (Platform.OS === "web" ? { position: "fixed" } : { position: "absolute" }) as unknown as ViewStyle;
+
+/**
+ * A panel: on phones a bottom sheet over the whole screen (dimmed backdrop, tap outside to close);
+ * on wide screens a popover under the map toolbar.
+ */
+export function Sheet({ title, onClose, testID, closeTestID, children, footer, wideStyle }: { title: string; onClose(): void; testID: string; closeTestID?: string; children: ReactNode; footer?: ReactNode; wideStyle?: ViewStyle }) {
+  const { t } = useTranslation();
+  const compact = useCompact();
+  const { height } = useWindowDimensions();
+  const header = (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingLeft: 16, paddingRight: 6, paddingTop: compact ? 8 : 6, paddingBottom: 4 }}>
+      <Text style={{ fontSize: compact ? 18 : 15, fontWeight: "700", color: colors.ink }}>{title}</Text>
+      <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("map.close")} testID={closeTestID} hitSlop={8}
+        style={{ width: compact ? 48 : 36, height: compact ? 48 : 36, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ fontSize: compact ? 24 : 18, color: colors.muted }}>✕</Text>
+      </Pressable>
+    </View>
+  );
+  if (!compact)
+    return (
+      <View testID={testID} style={[{ position: "absolute", left: 10, top: 52, width: 300, maxHeight: "80%", backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, ...shadow, zIndex: 20 }, wideStyle]}>
+        {header}
+        <ScrollView style={{ paddingHorizontal: 14 }} contentContainerStyle={{ paddingBottom: 12 }}>{children}</ScrollView>
+        {footer}
+      </View>
+    );
+  // rendered at the root of the page: nothing in the layout (side panel, cards) can cover it
+  const sheet = (
+    <View style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, zIndex: 1000, justifyContent: "flex-end" }]}>
+      <Pressable style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)" }]} onPress={onClose} accessibilityLabel={t("map.close")} />
+      <View testID={testID} style={{ backgroundColor: colors.panel, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: Math.round(height * 0.85), paddingBottom: 12, ...shadow }}>
+        <View style={{ alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginTop: 8 }} />
+        {header}
+        <ScrollView style={{ paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 8 }}>{children}</ScrollView>
+        {footer}
+      </View>
+    </View>
+  );
+  return <>{toRoot(sheet)}</>;
+}
 
 const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "environment", "infrastructure", "admin"];
 
 export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose }: { layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
   const { t } = useTranslation();
+  const compact = useCompact();
   const title = (l: MapLayerDef) => (l.date ? `${t(l.titleKey)} ${l.date}` : t(l.titleKey));
   const bases = [...layers.filter((l) => l.role === "basemap").map((l) => ({ id: l.id, label: title(l) })), { id: "streets", label: t("map.streets") }, { id: "blank", label: t("map.blank") }];
+  const row = { flexDirection: "row" as const, alignItems: "center" as const, gap: 12, minHeight: compact ? 48 : 34 };
+  const text = { fontSize: compact ? 16 : 13, color: colors.ink, flex: 1 };
+  const box = compact ? 22 : 16;
   return (
-    <View testID="layer-panel" style={{ position: "absolute", left: 10, top: 48, width: 290, maxHeight: "80%", backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 10 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>{t("map.layers")}</Text>
-        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("map.close")} testID="layers-close"><Text style={{ fontSize: 18, color: colors.muted }}>✕</Text></Pressable>
-      </View>
-      <ScrollView style={{ paddingHorizontal: 14 }} contentContainerStyle={{ paddingBottom: 12 }}>
-        <Text style={groupTitle}>{t("map.group.basemap")}</Text>
-        {bases.map((b) => (
-          <Pressable key={b.id} testID={`base-${b.id}`} accessibilityRole="radio" accessibilityState={{ checked: basemap === b.id }} onPress={() => onBasemap(b.id)} style={rowStyle}>
-            <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: basemap === b.id ? colors.accent : colors.line, alignItems: "center", justifyContent: "center" }}>
-              {basemap === b.id && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent }} />}
-            </View>
-            <Text style={rowText}>{b.label}</Text>
-          </Pressable>
-        ))}
-        {GROUPS.map((g) => {
-          const ls = layers.filter((l) => l.role === "overlay" && l.group === g);
-          if (ls.length === 0) return null;
-          return (
-            <View key={g}>
-              <Text style={groupTitle}>{t(`map.group.${g}`)}</Text>
-              {ls.map((l) => {
-                const on = overlays.includes(l.id);
-                return (
-                  <Pressable key={l.id} testID={`overlay-${l.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => onToggle(l.id)} style={rowStyle}>
-                    <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: on ? colors.accent : colors.line, backgroundColor: on ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}>
-                      {on && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900", lineHeight: 12 }}>✓</Text>}
-                    </View>
-                    <Text style={rowText}>{title(l)}</Text>
-                    {l.minzoom ? <Text style={{ fontSize: 10, color: colors.muted }}>{t("map.zoomIn")}</Text> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          );
-        })}
-        <Text style={{ fontSize: 11, color: colors.muted, marginTop: 10 }}>{t("map.layersSource")}</Text>
-      </ScrollView>
-    </View>
+    <Sheet title={t("map.layers")} onClose={onClose} testID="layer-panel" closeTestID="layers-close">
+      <Text style={groupTitle}>{t("map.group.basemap")}</Text>
+      {bases.map((b) => (
+        <Pressable key={b.id} testID={`base-${b.id}`} accessibilityRole="radio" accessibilityState={{ checked: basemap === b.id }} onPress={() => onBasemap(b.id)} style={row}>
+          <View style={{ width: box, height: box, borderRadius: box / 2, borderWidth: 2, borderColor: basemap === b.id ? colors.accent : colors.line, alignItems: "center", justifyContent: "center" }}>
+            {basemap === b.id && <View style={{ width: box / 2, height: box / 2, borderRadius: box / 4, backgroundColor: colors.accent }} />}
+          </View>
+          <Text style={text}>{b.label}</Text>
+        </Pressable>
+      ))}
+      {GROUPS.map((g) => {
+        const ls = layers.filter((l) => l.role === "overlay" && l.group === g);
+        if (ls.length === 0) return null;
+        return (
+          <View key={g}>
+            <Text style={groupTitle}>{t(`map.group.${g}`)}</Text>
+            {ls.map((l) => {
+              const on = overlays.includes(l.id);
+              return (
+                <Pressable key={l.id} testID={`overlay-${l.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => onToggle(l.id)} style={row}>
+                  <View style={{ width: box, height: box, borderRadius: 5, borderWidth: 2, borderColor: on ? colors.accent : colors.line, backgroundColor: on ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}>
+                    {on && <Text style={{ color: "#fff", fontSize: compact ? 14 : 10, fontWeight: "900", lineHeight: compact ? 16 : 12 }}>✓</Text>}
+                  </View>
+                  <Text style={text}>{title(l)}</Text>
+                  {l.minzoom ? <Text style={{ fontSize: 11, color: colors.muted }}>{t("map.zoomIn")}</Text> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        );
+      })}
+      <Text style={{ fontSize: 11, color: colors.muted, marginTop: 10 }}>{t("map.layersSource")}</Text>
+    </Sheet>
   );
 }
 
-const groupTitle = { fontSize: 11, fontWeight: "700" as const, color: colors.muted, letterSpacing: 0.5, marginTop: 10, marginBottom: 2, textTransform: "uppercase" as const };
-const rowStyle = { flexDirection: "row" as const, alignItems: "center" as const, gap: 10, paddingVertical: 6 };
-const rowText = { fontSize: 13, color: colors.ink, flex: 1 };
+const groupTitle = { fontSize: 12, fontWeight: "700" as const, color: colors.muted, letterSpacing: 0.5, marginTop: 12, marginBottom: 2, textTransform: "uppercase" as const };
 
 /** Download a text file (web). On native this arrives with the store builds. */
 export function download(name: string, mime: string, text: string | Uint8Array) {
@@ -107,6 +155,26 @@ const plotFeature = (p: Parcel): UserFeature => {
   return feature({ type: "Polygon", coordinates: rings }, p.label ?? p.nationalRef, "drawing", p.nationalRef);
 };
 
+/** Big floating map buttons (bottom right): zoom in, zoom out, my location. */
+export function MapFabs({ onZoomIn, onZoomOut, onLocate }: { onZoomIn(): void; onZoomOut(): void; onLocate?(): void }) {
+  const { t } = useTranslation();
+  const compact = useCompact();
+  const size = compact ? 52 : 42;
+  const fab = (label: string, a11y: string, onPress: () => void, testID: string) => (
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress}
+      style={({ pressed }) => [{ width: size, height: size, borderRadius: size / 2, backgroundColor: "rgba(255,255,255,0.97)", alignItems: "center", justifyContent: "center", ...shadow }, pressed && { backgroundColor: colors.allowedBg }]}>
+      <Text style={{ fontSize: compact ? 28 : 22, lineHeight: compact ? 32 : 26, color: colors.ink, fontWeight: "500" }}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={{ position: "absolute", right: 12, bottom: compact ? 44 : 36, gap: 10, alignItems: "center", zIndex: 10 }} pointerEvents="box-none">
+      {onLocate && fab("◎", t("btn.locate"), onLocate, "fab-locate")}
+      {fab("+", t("map.zoomInBtn"), onZoomIn, "fab-zoom-in")}
+      {fab("−", t("map.zoomOutBtn"), onZoomOut, "fab-zoom-out")}
+    </View>
+  );
+}
+
 export interface ToolbarProps {
   measure: MeasureTool;
   onMeasure(t: MeasureTool): void;
@@ -114,29 +182,28 @@ export interface ToolbarProps {
   result: MeasureResult | null;
   plot?: Parcel;
   shareUrl(): string;
-  layersOpen: boolean;
-  onLayers(): void;
+  panel: MapPanel;
+  setPanel(p: MapPanel): void;
   grid?: NationalGrid;
   onImport(): void;
   drawingsCount: number;
-  drawingsOpen: boolean;
-  onDrawings(): void;
   onSaveMeasure(): void;
   onFindInView(plot: string): Promise<string | undefined>;
 }
 
-export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, layersOpen, onLayers, grid, onImport, drawingsCount, drawingsOpen, onDrawings, onSaveMeasure, onFindInView }: ToolbarProps) {
+export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView }: ToolbarProps) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
+  const compact = useCompact();
   const [copied, setCopied] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [findOpen, setFindOpen] = useState(false);
   const [findText, setFindText] = useState("");
   const [findMsg, setFindMsg] = useState<string>();
+  const toggle = (p: Exclude<MapPanel, null>) => setPanel(panel === p ? null : p);
   const share = async () => {
+    setPanel(null);
     const url = shareUrl();
     try {
-      if (typeof navigator !== "undefined" && navigator.share && /Mobi/i.test(navigator.userAgent)) await navigator.share({ url, title: plot?.label ?? "PlotCheck" });
+      if (typeof navigator !== "undefined" && navigator.share && /Mobi|Android/i.test(navigator.userAgent)) await navigator.share({ url, title: plot?.label ?? "PlotCheck" });
       else await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -149,93 +216,98 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
     setFindMsg(t("loading.parcel"));
     const err = await onFindInView(findText.trim());
     setFindMsg(err ? t(`error.${err}`, { defaultValue: t("error.generic") }) : undefined);
-    if (!err) setFindOpen(false);
+    if (!err) setPanel(null);
   };
   const name = plot ? plot.nationalRef.replace(/[^\w-]+/g, "_") : "plot";
   const minPts = measure === "area" ? 3 : 1;
-  // phones: Layers + one "Tools" menu instead of a row of chips
-  const { width } = useWindowDimensions();
-  const compact = width < 700;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const close = () => setMenuOpen(false);
-  const toolChips = (
-    <>
-      <Pressable testID="btn-find" onPress={() => { setFindOpen((o) => !o); close(); }} style={chip(findOpen)}><Text style={chipText(findOpen)}>🔎 {t("map.findHere")}</Text></Pressable>
-        {(["distance", "area"] as const).map((m) => (
-          <Pressable key={m} testID={`tool-${m}`} onPress={() => { onMeasure(measure === m ? "none" : m); close(); }} style={chip(measure === m)}>
-            <Text style={chipText(measure === m)}>{m === "distance" ? "📏" : "▱"} {t(`map.tool.${m}`)}</Text>
-          </Pressable>
-        ))}
-        <Pressable testID="tool-import" onPress={() => { onImport(); close(); }} style={chip(false)}><Text style={chipText(false)}>⤒ {t("map.import")}</Text></Pressable>
-        {drawingsCount > 0 && (
-          <Pressable testID="btn-drawings" onPress={() => { onDrawings(); close(); }} style={chip(drawingsOpen)}><Text style={chipText(drawingsOpen)}>✎ {t("map.drawings", { count: drawingsCount })}</Text></Pressable>
-        )}
-        <Pressable testID="tool-share" onPress={share} style={chip(copied)}><Text style={chipText(copied)}>🔗 {copied ? t("map.copied") : t("map.share")}</Text></Pressable>
-        {plot && (
-          <Pressable testID="tool-export" onPress={() => { setExportOpen((o) => !o); close(); }} style={chip(exportOpen)}><Text style={chipText(exportOpen)}>⤓ {t("map.export")}</Text></Pressable>
-        )}
-    </>
-  );
+
+  // the tools: chips in a row on wide screens, big rows in a sheet on phones
+  const tools: { id: string; icon: string; label: string; on: boolean; run(): void; show?: boolean }[] = [
+    { id: "btn-find", icon: "🔎", label: t("map.findHere"), on: panel === "find", run: () => toggle("find") },
+    { id: "tool-distance", icon: "📏", label: t("map.tool.distance"), on: measure === "distance", run: () => { setPanel(null); onMeasure(measure === "distance" ? "none" : "distance"); } },
+    { id: "tool-area", icon: "▱", label: t("map.tool.area"), on: measure === "area", run: () => { setPanel(null); onMeasure(measure === "area" ? "none" : "area"); } },
+    { id: "tool-import", icon: "⤒", label: t("map.import"), on: false, run: () => { setPanel(null); onImport(); } },
+    { id: "btn-drawings", icon: "✎", label: t("map.drawings", { count: drawingsCount }), on: panel === "drawings", run: () => toggle("drawings"), show: drawingsCount > 0 },
+    { id: "tool-share", icon: "🔗", label: copied ? t("map.copied") : t("map.share"), on: copied, run: share },
+    { id: "tool-export", icon: "⤓", label: t("map.export"), on: panel === "export", run: () => toggle("export"), show: !!plot },
+  ].filter((x) => x.show !== false);
+
+  const exportItems = plot
+    ? [
+        { id: "kml", label: "KML (Google Earth)", run: () => download(`${name}.kml`, "application/vnd.google-earth.kml+xml", plotKml(plot)) },
+        { id: "geojson", label: "GeoJSON", run: () => download(`${name}.geojson`, "application/geo+json", plotGeoJson(plot)) },
+        ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`${name}.dxf`, "application/dxf", toDxf({ type: "FeatureCollection", features: [plotFeature(plot)] }, grid)) }] : []),
+      ]
+    : [];
+  const sheetRow = { flexDirection: "row" as const, alignItems: "center" as const, gap: 14, minHeight: 52, borderBottomWidth: 1, borderColor: colors.line };
+
   return (
     <>
-      <View style={{ position: "absolute", left: 10, top: 10, right: 52, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        <Pressable testID="btn-layers" onPress={() => { onLayers(); close(); }} style={chip(layersOpen)}><Text style={chipText(layersOpen)}>☰ {t("map.layers")}</Text></Pressable>
+      <View style={{ position: "absolute", left: 10, top: 10, right: compact ? 10 : 12, flexDirection: "row", flexWrap: "wrap", gap: compact ? 8 : 6, zIndex: 10 }} pointerEvents="box-none">
+        <Pressable testID="btn-layers" onPress={() => toggle("layers")} style={chip(panel === "layers", compact)}><Text style={chipText(panel === "layers", compact)}>☰ {t("map.layers")}</Text></Pressable>
         {compact ? (
-          <Pressable testID="btn-tools" onPress={() => setMenuOpen((o) => !o)} style={chip(menuOpen)}><Text style={chipText(menuOpen)}>🛠 {t("map.tools")} ▾</Text></Pressable>
+          <Pressable testID="btn-tools" onPress={() => toggle("tools")} style={chip(panel === "tools", compact)}><Text style={chipText(panel === "tools", compact)}>🛠 {t("map.tools")}</Text></Pressable>
         ) : (
-          toolChips
+          tools.map((x) => (
+            <Pressable key={x.id} testID={x.id} onPress={x.run} style={chip(x.on, compact)}><Text style={chipText(x.on, compact)}>{x.icon} {x.label}</Text></Pressable>
+          ))
         )}
-        {compact && measure !== "none" && <View style={chip(true)}><Text style={chipText(true)}>{t(`map.tool.${measure}`)}</Text></View>}
+        {compact && measure !== "none" && <View style={chip(true, compact)}><Text style={chipText(true, compact)}>{t(`map.tool.${measure}`)}</Text></View>}
       </View>
-      {compact && menuOpen && (
-        <View testID="tools-menu" style={{ position: "absolute", left: 10, top: 48, backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, padding: 8, gap: 6, alignItems: "flex-start", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 10 }}>
-          {toolChips}
-        </View>
-      )}
-      {findOpen && (
-        <View testID="find-box" style={{ position: "absolute", left: 10, top: 48, width: 260, backgroundColor: colors.panel, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 10 }}>
-          <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>{t("map.findHereHint")}</Text>
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            <TextInput testID="find-plot" value={findText} onChangeText={setFindText} onSubmitEditing={find} inputMode="numeric" placeholder={t("search.plotHint")}
-              style={{ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 14 }} />
-            <Pressable testID="find-go" onPress={find} style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, justifyContent: "center" }}>
-              <Text style={{ color: "#fff", fontWeight: "700" }}>→</Text>
-            </Pressable>
-          </View>
-          {findMsg && <Text testID="find-msg" style={{ fontSize: 12, color: colors.maybe, marginTop: 6 }}>{findMsg}</Text>}
-        </View>
-      )}
-      {exportOpen && plot && (
-        <View style={{ position: "absolute", right: 52, top: 48, backgroundColor: colors.panel, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 6 }}>
-          {[
-            { id: "kml", label: "KML (Google Earth)", run: () => download(`${name}.kml`, "application/vnd.google-earth.kml+xml", plotKml(plot)) },
-            { id: "geojson", label: "GeoJSON", run: () => download(`${name}.geojson`, "application/geo+json", plotGeoJson(plot)) },
-            ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`${name}.dxf`, "application/dxf", toDxf({ type: "FeatureCollection", features: [plotFeature(plot)] }, grid)) }] : []),
-          ].map((x) => (
-            <Pressable key={x.id} testID={`export-${x.id}`} onPress={() => { x.run(); setExportOpen(false); }} style={{ paddingVertical: 8, paddingHorizontal: 10 }}>
-              <Text style={{ fontSize: 13, color: colors.ink }}>{x.label}</Text>
+
+      {compact && panel === "tools" && (
+        <Sheet title={t("map.tools")} onClose={() => setPanel(null)} testID="tools-menu">
+          {tools.map((x) => (
+            <Pressable key={x.id} testID={x.id} onPress={x.run} style={({ pressed }) => [sheetRow, pressed && { backgroundColor: colors.allowedBg }]}>
+              <Text style={{ fontSize: 22, width: 30, textAlign: "center" }}>{x.icon}</Text>
+              <Text style={{ fontSize: 17, color: colors.ink, flex: 1, fontWeight: x.on ? "700" : "400" }}>{x.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </Sheet>
       )}
+
+      {panel === "find" && (
+        <Sheet title={t("map.findHere")} onClose={() => setPanel(null)} testID="find-box" wideStyle={{ width: 280 }}>
+          <Text style={{ fontSize: compact ? 15 : 12, color: colors.muted, marginBottom: 8 }}>{t("map.findHereHint")}</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TextInput testID="find-plot" value={findText} onChangeText={setFindText} onSubmitEditing={find} inputMode="numeric" placeholder={t("search.plotHint")} autoFocus
+              style={{ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: compact ? 12 : 8, fontSize: compact ? 18 : 14 }} />
+            <Pressable testID="find-go" onPress={find} style={{ backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: compact ? 20 : 14, justifyContent: "center" }}>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: compact ? 20 : 16 }}>→</Text>
+            </Pressable>
+          </View>
+          {findMsg && <Text testID="find-msg" style={{ fontSize: compact ? 14 : 12, color: colors.maybe, marginTop: 8 }}>{findMsg}</Text>}
+        </Sheet>
+      )}
+
+      {panel === "export" && plot && (
+        <Sheet title={t("map.export")} onClose={() => setPanel(null)} testID="export-menu" wideStyle={{ left: undefined, right: 12, width: 240 }}>
+          {exportItems.map((x) => (
+            <Pressable key={x.id} testID={`export-${x.id}`} onPress={() => { x.run(); setPanel(null); }} style={({ pressed }) => [compact ? sheetRow : { paddingVertical: 9 }, pressed && { backgroundColor: colors.allowedBg }]}>
+              <Text style={{ fontSize: compact ? 17 : 13, color: colors.ink }}>{x.label}</Text>
+            </Pressable>
+          ))}
+        </Sheet>
+      )}
+
       {measure !== "none" && (
-        <View testID="measure-box" style={{ position: "absolute", left: 10, bottom: 28, backgroundColor: "rgba(255,255,255,0.96)", borderRadius: 10, padding: 10, minWidth: 220, borderWidth: 1, borderColor: "#7B2FF7" }}>
+        <View testID="measure-box" style={{ position: "absolute", left: 10, bottom: compact ? 44 : 28, right: compact ? 78 : undefined, backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: 12, minWidth: compact ? undefined : 220, borderWidth: 1, borderColor: "#7B2FF7", zIndex: 10, ...shadow }}>
           {!result || result.points < (measure === "area" ? 3 : 2) ? (
-            <Text style={{ fontSize: 12, color: colors.muted }}>{t(`map.tool.${measure}Hint`)}</Text>
+            <Text style={{ fontSize: compact ? 14 : 12, color: colors.muted }}>{t(`map.tool.${measure}Hint`)}</Text>
           ) : (
             <>
-              {measure === "area" && <Text testID="measure-area" style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>{fmtArea(result.areaM2, lng, 1)}</Text>}
-              <Text testID="measure-length" style={{ fontSize: measure === "area" ? 12 : 15, fontWeight: measure === "area" ? "400" : "700", color: colors.ink }}>
+              {measure === "area" && <Text testID="measure-area" style={{ fontSize: compact ? 18 : 15, fontWeight: "700", color: colors.ink }}>{fmtArea(result.areaM2, lng, 1)}</Text>}
+              <Text testID="measure-length" style={{ fontSize: measure === "area" ? (compact ? 14 : 12) : compact ? 18 : 15, fontWeight: measure === "area" ? "400" : "700", color: colors.ink }}>
                 {measure === "area" ? t("map.perimeter", { m: fmtNumber(result.lengthM, lng, 1) }) : `${fmtNumber(result.lengthM, lng, 1)} m`}
               </Text>
             </>
           )}
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+          <View style={{ flexDirection: "row", gap: compact ? 18 : 12, marginTop: 8, flexWrap: "wrap" }}>
             {result && result.points >= minPts && (
-              <Pressable testID="measure-save" onPress={onSaveMeasure}><Text style={{ fontSize: 12, color: "#0284C7", fontWeight: "700" }}>{t("map.saveDrawing")}</Text></Pressable>
+              <Pressable testID="measure-save" hitSlop={8} onPress={onSaveMeasure}><Text style={{ fontSize: compact ? 15 : 12, color: "#0284C7", fontWeight: "700" }}>{t("map.saveDrawing")}</Text></Pressable>
             )}
-            <Pressable testID="measure-clear" onPress={onClear}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.clear")}</Text></Pressable>
-            <Pressable testID="measure-done" onPress={() => onMeasure("none")}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.done")}</Text></Pressable>
+            <Pressable testID="measure-clear" hitSlop={8} onPress={onClear}><Text style={{ fontSize: compact ? 15 : 12, color: colors.footprint, fontWeight: "600" }}>{t("map.clear")}</Text></Pressable>
+            <Pressable testID="measure-done" hitSlop={8} onPress={() => onMeasure("none")}><Text style={{ fontSize: compact ? 15 : 12, color: colors.footprint, fontWeight: "600" }}>{t("map.done")}</Text></Pressable>
           </View>
         </View>
       )}
@@ -245,36 +317,33 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
 
 export function DrawingsPanel({ drawings, grid, onDelete, onClearAll, onZoom, onClose }: { drawings: UserCollection; grid?: NationalGrid; onDelete(id: string): void; onClearAll(): void; onZoom(f: UserFeature): void; onClose(): void }) {
   const { t } = useTranslation();
+  const compact = useCompact();
   const kind = (f: UserFeature) => t(`map.geom.${f.geometry.type}`);
   const stamp = new Date().toISOString().slice(0, 10);
-  return (
-    <View testID="drawings-panel" style={{ position: "absolute", left: 10, top: 48, width: 300, maxHeight: "75%", backgroundColor: colors.panel, borderRadius: 12, borderWidth: 1, borderColor: colors.line, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 10 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>{t("map.myDrawings")}</Text>
-        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("map.close")} testID="drawings-close"><Text style={{ fontSize: 18, color: colors.muted }}>✕</Text></Pressable>
-      </View>
-      <ScrollView style={{ paddingHorizontal: 14 }} contentContainerStyle={{ paddingBottom: 8 }}>
-        {drawings.features.map((f) => (
-          <View key={f.id} testID={`drawing-${f.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.line }}>
-            <Pressable style={{ flex: 1 }} onPress={() => onZoom(f)}>
-              <Text style={{ fontSize: 13, color: colors.ink }} numberOfLines={1}>{f.properties.name || kind(f)}</Text>
-              <Text style={{ fontSize: 11, color: colors.muted }}>{kind(f)} · {t(`map.from.${f.properties.source}`)} · {allPositions(f.geometry).length} {t("map.vertices")}</Text>
-            </Pressable>
-            <Pressable onPress={() => onDelete(f.id)} accessibilityLabel={t("map.delete")}><Text style={{ color: colors.notAllowed, fontSize: 15 }}>🗑</Text></Pressable>
-          </View>
-        ))}
-      </ScrollView>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12, borderTopWidth: 1, borderColor: colors.line }}>
-        <Text style={{ fontSize: 12, color: colors.muted, width: "100%" }}>{t("map.exportAll")}</Text>
-        {[
-          { id: "kml", label: "KML", run: () => download(`plotcheck-${stamp}.kml`, "application/vnd.google-earth.kml+xml", toKml(drawings, "PlotCheck")) },
-          { id: "geojson", label: "GeoJSON", run: () => download(`plotcheck-${stamp}.geojson`, "application/geo+json", toGeoJson(drawings)) },
-          ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`plotcheck-${stamp}.dxf`, "application/dxf", toDxf(drawings, grid)) }] : []),
-        ].map((x) => (
-          <Pressable key={x.id} testID={`drawings-export-${x.id}`} onPress={x.run} style={chip(false)}><Text style={chipText(false)}>{x.label}</Text></Pressable>
-        ))}
-        <Pressable testID="drawings-clear" onPress={onClearAll} style={{ paddingVertical: 6 }}><Text style={{ fontSize: 12, color: colors.notAllowed, fontWeight: "600" }}>{t("map.clearAll")}</Text></Pressable>
-      </View>
+  const footer = (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12, borderTopWidth: 1, borderColor: colors.line }}>
+      <Text style={{ fontSize: 12, color: colors.muted, width: "100%" }}>{t("map.exportAll")}</Text>
+      {[
+        { id: "kml", label: "KML", run: () => download(`plotcheck-${stamp}.kml`, "application/vnd.google-earth.kml+xml", toKml(drawings, "PlotCheck")) },
+        { id: "geojson", label: "GeoJSON", run: () => download(`plotcheck-${stamp}.geojson`, "application/geo+json", toGeoJson(drawings)) },
+        ...(grid ? [{ id: "dxf", label: `DXF (${grid.name})`, run: () => download(`plotcheck-${stamp}.dxf`, "application/dxf", toDxf(drawings, grid)) }] : []),
+      ].map((x) => (
+        <Pressable key={x.id} testID={`drawings-export-${x.id}`} onPress={x.run} style={chip(false, compact)}><Text style={chipText(false, compact)}>{x.label}</Text></Pressable>
+      ))}
+      <Pressable testID="drawings-clear" onPress={onClearAll} style={{ paddingVertical: 10 }}><Text style={{ fontSize: compact ? 15 : 12, color: colors.notAllowed, fontWeight: "600" }}>{t("map.clearAll")}</Text></Pressable>
     </View>
+  );
+  return (
+    <Sheet title={t("map.myDrawings")} onClose={onClose} testID="drawings-panel" closeTestID="drawings-close" footer={footer}>
+      {drawings.features.map((f) => (
+        <View key={f.id} testID={`drawing-${f.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: compact ? 56 : 40, borderBottomWidth: 1, borderColor: colors.line }}>
+          <Pressable style={{ flex: 1, paddingVertical: 6 }} onPress={() => onZoom(f)}>
+            <Text style={{ fontSize: compact ? 16 : 13, color: colors.ink }} numberOfLines={1}>{f.properties.name || kind(f)}</Text>
+            <Text style={{ fontSize: compact ? 13 : 11, color: colors.muted }}>{kind(f)} · {t(`map.from.${f.properties.source}`)} · {allPositions(f.geometry).length} {t("map.vertices")}</Text>
+          </Pressable>
+          <Pressable onPress={() => onDelete(f.id)} accessibilityLabel={t("map.delete")} hitSlop={8} style={{ padding: 8 }}><Text style={{ color: colors.notAllowed, fontSize: compact ? 20 : 15 }}>🗑</Text></Pressable>
+        </View>
+      ))}
+    </Sheet>
   );
 }
