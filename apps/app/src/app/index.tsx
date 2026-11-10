@@ -710,6 +710,8 @@ export default function Home() {
           const p = parcels.find((x) => x.nationalRef === id);
           if (p) void selectParcel(p);
         }}
+        fmtLength={(m) => `${fmtNumber(m, lng, 1)} m`}
+        fmtArea={(m2) => fmtArea(m2, lng, 1)}
         attribution={(k, date) => (date ? `${t("map.orthoCredit", { date })}` : t(k))}
       />
       <MapToolbar
@@ -726,6 +728,8 @@ export default function Home() {
         drawingsCount={drawings.features.length}
         onSaveMeasure={saveMeasure}
         onFindInView={findInView}
+        onUndo={() => mapRef.current?.undoMeasure()}
+        getView={() => mapRef.current?.view()}
         searchContent={plotSearch(() => setMapPanel(null))}
       />
       <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
@@ -742,6 +746,7 @@ export default function Home() {
       {mapPanel === "layers" && (
         <LayerPanel
           layers={mapLayers}
+          googleLocked={googleLayers.length === 0}
           basemap={basemap ?? "streets"}
           overlays={overlays ?? []}
           onBasemap={setBasemap}

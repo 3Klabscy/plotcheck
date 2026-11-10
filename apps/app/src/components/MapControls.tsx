@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { toRoot } from "../lib/portal";
-import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
-import type { NationalGrid, Parcel } from "@plotcheck/core";
+import { toGrid, type NationalGrid, type Parcel } from "@plotcheck/core";
 import { allPositions, feature, toDxf, toGeoJson, toKml, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MapLayerDef, MapLayerGroup } from "../lib/api";
 import { fmtArea, fmtNumber } from "../lib/format";
@@ -74,7 +74,7 @@ export function Sheet({ title, onClose, testID, closeTestID, children, footer, w
 
 const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "water", "environment", "infrastructure", "admin", "statistics"];
 
-export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose }: { layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
+export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose, googleLocked }: { googleLocked?: boolean; layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
   const { t } = useTranslation();
   const compact = useCompact();
   const title = (l: MapLayerDef) => (l.date ? `${t(l.titleKey)} ${l.date}` : t(l.titleKey));
@@ -94,6 +94,18 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
           <Text style={text}>{b.label}</Text>
         </Pressable>
       ))}
+      {googleLocked && (
+        <View testID="google-locked" style={{ marginTop: 4 }}>
+          {(["googleRoadmap", "googleSatellite", "googleHybrid"] as const).map((k) => (
+            <View key={k} style={[row, { opacity: 0.5 }]}>
+              <View style={{ width: box, height: box, borderRadius: box / 2, borderWidth: 2, borderColor: colors.line }} />
+              <Text style={text}>{t(`map.${k}`)}</Text>
+              <Text style={{ fontSize: compact ? 15 : 12 }}>🔒</Text>
+            </View>
+          ))}
+          <Text style={{ fontSize: compact ? 13 : 11, color: colors.muted, marginTop: 2 }}>{t("map.googleLocked")}</Text>
+        </View>
+      )}
       {GROUPS.map((g) => {
         const ls = layers.filter((l) => l.role === "overlay" && l.group === g);
         if (ls.length === 0) return null;
@@ -125,6 +137,9 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
     </Sheet>
   );
 }
+
+const linkBtn = (compact: boolean) => ({ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: 8, paddingVertical: compact ? 10 : 7, paddingHorizontal: 6, alignItems: "center" as const, backgroundColor: colors.panel });
+const linkText = (compact: boolean) => ({ fontSize: compact ? 14 : 12, fontWeight: "700" as const, color: colors.accent, textAlign: "center" as const });
 
 const groupTitle = { fontSize: 12, fontWeight: "700" as const, color: colors.muted, letterSpacing: 0.5, marginTop: 12, marginBottom: 2, textTransform: "uppercase" as const };
 
@@ -198,9 +213,28 @@ export interface ToolbarProps {
   onFindInView(plot: string): Promise<string | undefined>;
   /** The plot search form (district → municipality → quarter → sheet/plan → block → plot), shown under "Find". */
   searchContent?: ReactNode;
+  /** Remove the last measured point. */
+  onUndo(): void;
+  /** Current map centre and zoom (to open the same view in Google Maps). */
+  getView(): { lng: number; lat: number; zoom: number } | undefined;
 }
 
-export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView, searchContent }: ToolbarProps) {
+/** Google Maps links (official URL scheme; on phones they open the Google Maps app). */
+export const googleMaps = {
+  place: (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`,
+  directions: (lat: number, lng: number) => `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lng.toFixed(6)}`,
+  view: (lat: number, lng: number, zoom: number, satellite: boolean) =>
+    `https://www.google.com/maps/@?api=1&map_action=map&center=${lat.toFixed(6)},${lng.toFixed(6)}&zoom=${Math.round(Math.min(21, Math.max(3, zoom)))}${satellite ? "&basemap=satellite" : ""}`,
+};
+const openUrl = (u: string) => void Linking.openURL(u);
+
+export function centroid(p: Parcel): [number, number] {
+  const ring = (p.geometry.type === "Polygon" ? p.geometry.coordinates[0] : p.geometry.coordinates[0]?.[0]) ?? [];
+  const pts = ring.slice(0, -1);
+  return [pts.reduce((a, c) => a + c[0]!, 0) / pts.length, pts.reduce((a, c) => a + c[1]!, 0) / pts.length];
+}
+
+export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView, searchContent, onUndo, getView }: ToolbarProps) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const compact = useCompact();
@@ -235,6 +269,19 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
     { id: "btn-find", icon: "#", label: t("map.findHere"), on: panel === "find", run: () => toggle("find") },
     { id: "tool-distance", icon: "📏", label: t("map.tool.distance"), on: measure === "distance", run: () => { setPanel(null); onMeasure(measure === "distance" ? "none" : "distance"); } },
     { id: "tool-area", icon: "▱", label: t("map.tool.area"), on: measure === "area", run: () => { setPanel(null); onMeasure(measure === "area" ? "none" : "area"); } },
+    { id: "tool-point", icon: "📍", label: t("map.tool.point"), on: measure === "point", run: () => { setPanel(null); onMeasure(measure === "point" ? "none" : "point"); } },
+    { id: "tool-directions", icon: "🧭", label: t("map.tool.directions"), on: false, run: () => {
+      setPanel(null);
+      const target = plot ? centroid(plot) : measure === "point" && result ? result.coords[0] : undefined;
+      const v = getView();
+      if (target) openUrl(googleMaps.directions(target[1], target[0]));
+      else if (v) openUrl(googleMaps.directions(v.lat, v.lng));
+    } },
+    { id: "tool-google", icon: "🌍", label: t("map.tool.googleView"), on: false, run: () => {
+      setPanel(null);
+      const v = getView();
+      if (v) openUrl(googleMaps.view(v.lat, v.lng, v.zoom, true));
+    } },
     { id: "tool-import", icon: "⤒", label: t("map.import"), on: false, run: () => { setPanel(null); onImport(); } },
     { id: "btn-drawings", icon: "✎", label: t("map.drawings", { count: drawingsCount }), on: panel === "drawings", run: () => toggle("drawings"), show: drawingsCount > 0 },
     { id: "tool-share", icon: "🔗", label: copied ? t("map.copied") : t("map.share"), on: copied, run: share },
@@ -309,24 +356,68 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
       )}
 
       {measure !== "none" && (
-        <View testID="measure-box" style={{ position: "absolute", left: 10, bottom: compact ? 44 : 28, right: compact ? 78 : undefined, backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: 12, minWidth: compact ? undefined : 220, borderWidth: 1, borderColor: "#7B2FF7", zIndex: 10, ...shadow }}>
-          {!result || result.points < (measure === "area" ? 3 : 2) ? (
-            <Text style={{ fontSize: compact ? 14 : 12, color: colors.muted }}>{t(`map.tool.${measure}Hint`)}</Text>
+        <View testID="measure-box" style={{ position: "absolute", left: 8, bottom: compact ? 8 : 28, right: compact ? 76 : undefined, maxWidth: compact ? undefined : 320, backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: compact ? 9 : 12, minWidth: compact ? undefined : 240, borderWidth: 1, borderColor: "#7B2FF7", zIndex: 10, ...shadow }}>
+          {!compact && <Text style={{ fontSize: 11, fontWeight: "700", color: "#7B2FF7", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{t(`map.tool.${measure}`)}</Text>}
+          {measure === "point" ? (
+            result ? (
+              <View testID="point-info">
+                <Text selectable testID="point-latlng" style={{ fontSize: compact ? 16 : 14, fontWeight: "700", color: colors.ink, fontFamily: Platform.OS === "web" ? "ui-monospace, Menlo, monospace" : undefined }}>
+                  {result.coords[0]![1].toFixed(6)}, {result.coords[0]![0].toFixed(6)}
+                </Text>
+                {grid && (() => {
+                  const [e, n] = toGrid(grid, result.coords[0]![0], result.coords[0]![1]);
+                  return <Text selectable testID="point-grid" style={{ fontSize: compact ? 13 : 12, color: colors.ink }}>{grid.name}: E {fmtNumber(e, lng, 2)} · N {fmtNumber(n, lng, 2)}</Text>;
+                })()}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                  <Pressable testID="point-google" onPress={() => openUrl(googleMaps.place(result.coords[0]![1], result.coords[0]![0]))} style={linkBtn(compact)}><Text style={linkText(compact)}>📍 {t("map.googleOpen")}</Text></Pressable>
+                  <Pressable testID="point-directions" onPress={() => openUrl(googleMaps.directions(result.coords[0]![1], result.coords[0]![0]))} style={linkBtn(compact)}><Text style={linkText(compact)}>🧭 {t("map.googleDirections")}</Text></Pressable>
+                </View>
+              </View>
+            ) : (
+              <Text style={{ fontSize: compact ? 14 : 12, color: colors.muted }}>{t("map.tool.pointHint")}</Text>
+            )
+          ) : !result || result.points < (measure === "area" ? 3 : 2) ? (
+            <Text style={{ fontSize: compact ? 14 : 12, color: colors.muted }}>{t(`map.tool.${measure}Hint`)}{result ? ` (${result.points})` : ""}</Text>
           ) : (
             <>
-              {measure === "area" && <Text testID="measure-area" style={{ fontSize: compact ? 18 : 15, fontWeight: "700", color: colors.ink }}>{fmtArea(result.areaM2, lng, 1)}</Text>}
-              <Text testID="measure-length" style={{ fontSize: measure === "area" ? (compact ? 14 : 12) : compact ? 18 : 15, fontWeight: measure === "area" ? "400" : "700", color: colors.ink }}>
+              {measure === "area" && <Text testID="measure-area" style={{ fontSize: compact ? 18 : 17, fontWeight: "700", color: colors.ink }}>{fmtArea(result.areaM2, lng, 1)}</Text>}
+              <Text testID="measure-length" style={{ fontSize: measure === "area" ? (compact ? 13 : 12) : compact ? 18 : 17, fontWeight: measure === "area" ? "400" : "700", color: colors.ink }}>
                 {measure === "area" ? t("map.perimeter", { m: fmtNumber(result.lengthM, lng, 1) }) : `${fmtNumber(result.lengthM, lng, 1)} m`}
               </Text>
+              {!compact && result.segmentsM.length > 1 && (
+                <Text testID="measure-segments" style={{ fontSize: compact ? 12 : 11, color: colors.muted, marginTop: 2 }} numberOfLines={3}>
+                  {result.segmentsM.map((m) => fmtNumber(m, lng, 1)).join(" + ")} m
+                </Text>
+              )}
+              {!compact && <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{t("map.tool.dragHint")}</Text>}
             </>
           )}
-          <View style={{ flexDirection: "row", gap: compact ? 18 : 12, marginTop: 8, flexWrap: "wrap" }}>
-            {result && result.points >= minPts && (
-              <Pressable testID="measure-save" hitSlop={8} onPress={onSaveMeasure}><Text style={{ fontSize: compact ? 15 : 12, color: "#0284C7", fontWeight: "700" }}>{t("map.saveDrawing")}</Text></Pressable>
+          {compact ? (
+            <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
+              {[
+                { id: "measure-undo", icon: "↶", label: t("map.undo"), show: !!result && measure !== "point", run: onUndo, color: "#7B2FF7" },
+                { id: "measure-save", icon: "💾", label: t("map.saveDrawing"), show: !!result && result.points >= minPts, run: onSaveMeasure, color: "#0284C7" },
+                { id: "measure-clear", icon: "🗑", label: t("map.clear"), show: true, run: onClear, color: colors.footprint },
+                { id: "measure-done", icon: "✓", label: t("map.done"), show: true, run: () => onMeasure("none"), color: colors.accent },
+              ].filter((x) => x.show).map((x) => (
+                <Pressable key={x.id} testID={x.id} accessibilityLabel={x.label} onPress={x.run}
+                  style={{ flex: 1, minHeight: 40, borderRadius: 9, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", backgroundColor: colors.panel }}>
+                  <Text style={{ fontSize: 17, color: x.color, fontWeight: "700" }}>{x.icon}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+            {result && measure !== "point" && (
+              <Pressable testID="measure-undo" hitSlop={8} onPress={onUndo}><Text style={{ fontSize: 12, color: "#7B2FF7", fontWeight: "700" }}>↶ {t("map.undo")}</Text></Pressable>
             )}
-            <Pressable testID="measure-clear" hitSlop={8} onPress={onClear}><Text style={{ fontSize: compact ? 15 : 12, color: colors.footprint, fontWeight: "600" }}>{t("map.clear")}</Text></Pressable>
-            <Pressable testID="measure-done" hitSlop={8} onPress={() => onMeasure("none")}><Text style={{ fontSize: compact ? 15 : 12, color: colors.footprint, fontWeight: "600" }}>{t("map.done")}</Text></Pressable>
+            {result && result.points >= minPts && (
+              <Pressable testID="measure-save" hitSlop={8} onPress={onSaveMeasure}><Text style={{ fontSize: 12, color: "#0284C7", fontWeight: "700" }}>{t("map.saveDrawing")}</Text></Pressable>
+            )}
+            <Pressable testID="measure-clear" hitSlop={8} onPress={onClear}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.clear")}</Text></Pressable>
+            <Pressable testID="measure-done" hitSlop={8} onPress={() => onMeasure("none")}><Text style={{ fontSize: 12, color: colors.footprint, fontWeight: "600" }}>{t("map.done")}</Text></Pressable>
           </View>
+          )}
         </View>
       )}
     </>

@@ -34,13 +34,30 @@ function sourceFor(l: Exclude<MapLayerDef, { kind: "contours" }>): StyleSpecific
   return { ...common, tiles: [arcgisTiles(l.url, l.layers)], tileSize: 512 };
 }
 
-const measureFc = (pts: [number, number][], area: boolean) => ({
-  type: "FeatureCollection" as const,
-  features: [
-    ...(pts.length >= 2 ? [{ type: "Feature" as const, properties: {}, geometry: area && pts.length >= 3 ? { type: "Polygon" as const, coordinates: [[...pts, pts[0]!]] } : { type: "LineString" as const, coordinates: pts } }] : []),
-    ...pts.map((c) => ({ type: "Feature" as const, properties: {}, geometry: { type: "Point" as const, coordinates: c } })),
-  ],
-});
+const PURPLE = "#7B2FF7";
+type Pt = [number, number];
+const segLen = (a: Pt, b: Pt) => pathLengthM([a, b], false);
+
+/** The measurement drawn on the map: line or polygon, numbered vertices and a label on every segment. */
+function measureFc(pts: Pt[], tool: string, fmtLen: (m: number) => string, fmtArea: (m2: number) => string) {
+  const area = tool === "area";
+  const feats: GeoJSON.Feature[] = [];
+  if (pts.length >= 2 && tool !== "point")
+    feats.push({ type: "Feature", properties: {}, geometry: area && pts.length >= 3 ? { type: "Polygon", coordinates: [[...pts, pts[0]!]] } : { type: "LineString", coordinates: pts } });
+  pts.forEach((c, i) => feats.push({ type: "Feature", properties: { kind: "vertex", i }, geometry: { type: "Point", coordinates: c } }));
+  if (tool !== "point") {
+    const segs: [Pt, Pt][] = pts.slice(1).map((c, i) => [pts[i]!, c]);
+    if (area && pts.length >= 3) segs.push([pts[pts.length - 1]!, pts[0]!]);
+    for (const [a, b] of segs)
+      feats.push({ type: "Feature", properties: { kind: "label", text: fmtLen(segLen(a, b)) }, geometry: { type: "Point", coordinates: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] } });
+    if (area && pts.length >= 3) {
+      const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+      feats.push({ type: "Feature", properties: { kind: "total", text: fmtArea(ringAreaM2(pts)) }, geometry: { type: "Point", coordinates: [cx, cy] } });
+    } else if (pts.length >= 3)
+      feats.push({ type: "Feature", properties: { kind: "total", text: `Σ ${fmtLen(pathLengthM(pts, false))}` }, geometry: { type: "Point", coordinates: pts[pts.length - 1]! } });
+  }
+  return { type: "FeatureCollection" as const, features: feats };
+}
 
 function bounds(g: PolygonGeometry): [[number, number], [number, number]] {
   const pts = (g.type === "Polygon" ? g.coordinates.flat() : g.coordinates.flat(2)) as number[][];
@@ -61,8 +78,23 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     fitBounds: (b) => map.current?.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom: 18, duration: 600 }),
     zoomIn: () => map.current?.zoomIn({ duration: 250 }),
     zoomOut: () => map.current?.zoomOut({ duration: 250 }),
+    undoMeasure: () => {
+      measurePts.current = measurePts.current.slice(0, -1);
+      drawMeasure();
+    },
+    view: () => {
+      const m = map.current;
+      if (!m) return undefined;
+      const c = m.getCenter();
+      return { lng: c.lng, lat: c.lat, zoom: m.getZoom() };
+    },
   }));
-  const measurePts = useRef<[number, number][]>([]);
+  const measurePts = useRef<Pt[]>([]);
+  const dragging = useRef<number | null>(null);
+  const justDragged = useRef(false);
+  // phones send mouse events after a tap: no cursor readout or live line for those
+  const lastTouch = useRef(0);
+  const touchRecently = () => Date.now() - lastTouch.current < 1500;
   const cursorBox = useRef<HTMLDivElement | null>(null);
 
   // create once
@@ -123,10 +155,19 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       m.addLayer({ id: "user-fill", type: "fill", source: "user", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#0284C7", "fill-opacity": 0.12 } });
       m.addLayer({ id: "user-line", type: "line", source: "user", filter: ["!=", "$type", "Point"], paint: { "line-color": "#0284C7", "line-width": 2.2 } });
       m.addLayer({ id: "user-pts", type: "circle", source: "user", filter: ["==", "$type", "Point"], paint: { "circle-radius": 5, "circle-color": "#0284C7", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
-      m.addSource("measure", { type: "geojson", data: measureFc([], false) });
-      m.addLayer({ id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#7B2FF7", "fill-opacity": 0.15 } });
-      m.addLayer({ id: "measure-line", type: "line", source: "measure", filter: ["!=", "$type", "Point"], paint: { "line-color": "#7B2FF7", "line-width": 2.5, "line-dasharray": [3, 1.5] } });
-      m.addLayer({ id: "measure-pts", type: "circle", source: "measure", filter: ["==", "$type", "Point"], paint: { "circle-radius": 4.5, "circle-color": "#fff", "circle-stroke-color": "#7B2FF7", "circle-stroke-width": 2 } });
+      m.addSource("measure", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addSource("measure-live", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({ id: "measure-fill", type: "fill", source: "measure", filter: ["==", "$type", "Polygon"], paint: { "fill-color": PURPLE, "fill-opacity": 0.15 } });
+      m.addLayer({ id: "measure-line", type: "line", source: "measure", filter: ["!=", "$type", "Point"], paint: { "line-color": PURPLE, "line-width": 3 } });
+      m.addLayer({ id: "measure-live-line", type: "line", source: "measure-live", filter: ["==", "$type", "LineString"], paint: { "line-color": PURPLE, "line-width": 2, "line-dasharray": [2, 2] } });
+      m.addLayer({ id: "measure-pts", type: "circle", source: "measure", filter: ["==", ["get", "kind"], "vertex"], paint: { "circle-radius": 7, "circle-color": "#fff", "circle-stroke-color": PURPLE, "circle-stroke-width": 3 } });
+      const label = (id: string, source: string, kind: string, size: number) =>
+        m.addLayer({ id, type: "symbol", source, filter: ["==", ["get", "kind"], kind],
+          layout: { "text-field": ["get", "text"], "text-size": size, "text-font": ["Noto Sans Bold"], "text-allow-overlap": true, "text-ignore-placement": true, "text-offset": [0, kind === "total" ? 0 : -0.9] },
+          paint: { "text-color": kind === "total" ? "#fff" : PURPLE, "text-halo-color": kind === "total" ? PURPLE : "#fff", "text-halo-width": kind === "total" ? 3 : 2 } });
+      label("measure-labels", "measure", "label", 13);
+      label("measure-total", "measure", "total", 15);
+      label("measure-live-label", "measure-live", "label", 13);
       loaded.current = true;
       sync();
     });
@@ -147,7 +188,9 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     m.on("click", (e) => {
       const tool = latest.current.measure;
       if (tool !== "none") {
-        measurePts.current = [...measurePts.current, [e.lngLat.lng, e.lngLat.lat]];
+        if (justDragged.current) { justDragged.current = false; return; }
+        const pt: Pt = [e.lngLat.lng, e.lngLat.lat];
+        measurePts.current = tool === "point" ? [pt] : [...measurePts.current, pt];
         drawMeasure();
         return;
       }
@@ -156,10 +199,66 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
       if (id && latest.current.onSelectNeighbour) latest.current.onSelectNeighbour(id);
       else latest.current.onTap({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     });
+    // drag a measured point to move it (mouse and touch)
+    // a finger is not precise: grab a measured point within ~24 px of the touch (10 px for a mouse)
+    const startDrag = (e: maplibregl.MapMouseEvent | maplibregl.MapTouchEvent) => {
+      if (latest.current.measure === "none" || measurePts.current.length === 0) return;
+      const touch = "points" in e;
+      if (touch && (e.originalEvent as TouchEvent).touches.length > 1) return; // pinch zoom
+      const r = touch ? 24 : 10;
+      // nearest measured point on screen (projected directly: does not wait for the map to redraw)
+      let best = -1, bestD = r * r;
+      measurePts.current.forEach((c, i) => {
+        const q = m.project(c);
+        const d = (q.x - e.point.x) ** 2 + (q.y - e.point.y) ** 2;
+        if (d <= bestD) { bestD = d; best = i; }
+      });
+      if (best < 0) return;
+      e.preventDefault();
+      dragging.current = best;
+      m.dragPan.disable();
+      m.getCanvas().style.cursor = "grabbing";
+    };
+    const moveDrag = (e: maplibregl.MapMouseEvent | maplibregl.MapTouchEvent) => {
+      const i = dragging.current;
+      if (i === null) return;
+      measurePts.current = measurePts.current.map((c, k) => (k === i ? [e.lngLat.lng, e.lngLat.lat] : c));
+      drawMeasure();
+    };
+    const endDrag = () => {
+      if (dragging.current === null) return;
+      dragging.current = null;
+      justDragged.current = true;
+      setTimeout(() => (justDragged.current = false), 350);
+      m.dragPan.enable();
+      m.getCanvas().style.cursor = "crosshair";
+    };
+    el.current.addEventListener("touchstart", () => (lastTouch.current = Date.now()), { capture: true, passive: true });
+    m.on("mousedown", startDrag);
+    m.on("touchstart", startDrag);
+    m.on("mousemove", moveDrag);
+    m.on("touchmove", moveDrag);
+    m.on("mouseup", endDrag);
+    m.on("touchend", endDrag);
+    m.on("mouseenter", "measure-pts", () => { if (latest.current.measure !== "none") m.getCanvas().style.cursor = "grab"; });
+    m.on("mouseleave", "measure-pts", () => { if (latest.current.measure !== "none" && dragging.current === null) m.getCanvas().style.cursor = "crosshair"; });
+    // live line from the last point to the cursor
+    m.on("mousemove", (e) => {
+      const p = latest.current, pts = measurePts.current, src = m.getSource("measure-live") as GeoJSONSource | undefined;
+      if (!src) return;
+      if (touchRecently() || p.measure === "none" || p.measure === "point" || pts.length === 0 || dragging.current !== null) return src.setData({ type: "FeatureCollection", features: [] });
+      const last = pts[pts.length - 1]!, cur: Pt = [e.lngLat.lng, e.lngLat.lat];
+      const fmtLen = p.fmtLength ?? ((x: number) => `${x.toFixed(1)} m`);
+      src.setData({ type: "FeatureCollection", features: [
+        { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [last, cur] } },
+        { type: "Feature", properties: { kind: "label", text: fmtLen(segLen(last, cur)) }, geometry: { type: "Point", coordinates: [(last[0] + cur[0]) / 2, (last[1] + cur[1]) / 2] } },
+      ] });
+    });
+    m.on("mouseout", () => (m.getSource("measure-live") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: [] }));
     m.on("mousemove", (e) => {
       const fmt = latest.current.formatCursor, box = cursorBox.current;
       if (!box) return;
-      if (!fmt) { box.style.display = "none"; return; }
+      if (!fmt || touchRecently()) { box.style.display = "none"; return; }
       box.style.display = "block";
       box.textContent = fmt(e.lngLat.lng, e.lngLat.lat);
     });
@@ -220,11 +319,14 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
   function drawMeasure() {
     const m = map.current;
     if (!m || !loaded.current) return;
-    const tool = latest.current.measure;
-    const pts = measurePts.current;
-    (m.getSource("measure") as GeoJSONSource).setData(measureFc(pts, tool === "area"));
-    if (tool === "none" || pts.length === 0) return latest.current.onMeasure?.(null);
-    latest.current.onMeasure?.({ tool, points: pts.length, coords: [...pts], lengthM: pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0 });
+    const p = latest.current, tool = p.measure, pts = measurePts.current;
+    const fmtLen = p.fmtLength ?? ((x: number) => `${x.toFixed(1)} m`), fmtA = p.fmtArea ?? ((x: number) => `${x.toFixed(1)} m²`);
+    (m.getSource("measure") as GeoJSONSource).setData(measureFc(pts, tool, fmtLen, fmtA) as never);
+    (m.getSource("measure-live") as GeoJSONSource).setData({ type: "FeatureCollection", features: [] });
+    if (tool === "none" || pts.length === 0) return p.onMeasure?.(null);
+    const segmentsM = pts.slice(1).map((c, i) => segLen(pts[i]!, c));
+    if (tool === "area" && pts.length >= 3) segmentsM.push(segLen(pts[pts.length - 1]!, pts[0]!));
+    p.onMeasure?.({ tool, points: pts.length, coords: [...pts], lengthM: tool === "point" ? 0 : pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0, segmentsM });
   }
 
   useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure, props.drawings]);

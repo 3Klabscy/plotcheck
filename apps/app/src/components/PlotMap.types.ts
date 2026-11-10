@@ -2,8 +2,16 @@ import type { PolygonGeometry } from "@plotcheck/core";
 import type { MapLayerDef } from "../lib/api";
 import type { UserCollection } from "../lib/userLayer";
 
-export type MeasureTool = "none" | "distance" | "area";
-export interface MeasureResult { tool: Exclude<MeasureTool, "none">; points: number; coords: [number, number][]; lengthM: number; areaM2: number }
+export type MeasureTool = "none" | "distance" | "area" | "point";
+export interface MeasureResult {
+  tool: Exclude<MeasureTool, "none">;
+  points: number;
+  coords: [number, number][];
+  lengthM: number;
+  areaM2: number;
+  /** Length of each segment, in order (distance/area). */
+  segmentsM: number[];
+}
 
 export interface PlotMapProps {
   layers: MapLayerDef[];
@@ -29,6 +37,9 @@ export interface PlotMapProps {
   formatCursor?(lng: number, lat: number): string;
   /** Contour lines for a view box (layer kind "contours"). */
   loadContours?(bbox: [number, number, number, number], signal: AbortSignal): Promise<GeoJSON.FeatureCollection>;
+  /** Labels drawn on the map while measuring (localised numbers). */
+  fmtLength?(m: number): string;
+  fmtArea?(m2: number): string;
   /** Credit line for a layer's attribution key (already translated). */
   attribution(key: string, date?: string): string;
 }
@@ -38,4 +49,8 @@ export interface PlotMapHandle {
   fitBounds(b: [number, number, number, number]): void;
   zoomIn(): void;
   zoomOut(): void;
+  /** Remove the last measured point. */
+  undoMeasure(): void;
+  /** Current centre and zoom (for "open this view in Google Maps"). */
+  view(): { lng: number; lat: number; zoom: number } | undefined;
 }
