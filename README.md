@@ -89,6 +89,20 @@ Checks:
 npm test && npm run typecheck && npm run lint
 ```
 
+## Preview (app and API on one address)
+
+For a quick test on another device, the dev server can also serve the built web app:
+
+```bash
+(cd apps/app && EXPO_PUBLIC_API_URL="" npx expo export --platform web --output-dir ../../dist-web)
+```
+
+```bash
+PORT=8080 STATIC_DIR=$PWD/dist-web npx tsx apps/api-dev/src/server.ts
+```
+
+Without Supabase settings everything is unlocked and there is no sign-in.
+
 ## Accounts (Supabase Auth)
 
 Sign-in is by a 6-digit code sent by e-mail (no passwords). Each user keeps "My plots": the plot,
