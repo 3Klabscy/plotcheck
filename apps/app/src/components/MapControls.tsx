@@ -10,7 +10,7 @@ import { colors } from "../theme";
 import type { MeasureResult, MeasureTool } from "./PlotMap.types";
 
 /** One map panel open at a time. */
-export type MapPanel = "layers" | "tools" | "find" | "export" | "drawings" | null;
+export type MapPanel = "layers" | "tools" | "search" | "find" | "export" | "drawings" | null;
 
 /** Phones and narrow windows: bigger touch targets, panels as bottom sheets. */
 export function useCompact() {
@@ -196,9 +196,11 @@ export interface ToolbarProps {
   drawingsCount: number;
   onSaveMeasure(): void;
   onFindInView(plot: string): Promise<string | undefined>;
+  /** The plot search form (district → municipality → quarter → sheet/plan → block → plot), shown under "Find". */
+  searchContent?: ReactNode;
 }
 
-export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView }: ToolbarProps) {
+export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView, searchContent }: ToolbarProps) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const compact = useCompact();
@@ -230,7 +232,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
 
   // the tools: chips in a row on wide screens, big rows in a sheet on phones
   const tools: { id: string; icon: string; label: string; on: boolean; run(): void; show?: boolean }[] = [
-    { id: "btn-find", icon: "🔎", label: t("map.findHere"), on: panel === "find", run: () => toggle("find") },
+    { id: "btn-find", icon: "#", label: t("map.findHere"), on: panel === "find", run: () => toggle("find") },
     { id: "tool-distance", icon: "📏", label: t("map.tool.distance"), on: measure === "distance", run: () => { setPanel(null); onMeasure(measure === "distance" ? "none" : "distance"); } },
     { id: "tool-area", icon: "▱", label: t("map.tool.area"), on: measure === "area", run: () => { setPanel(null); onMeasure(measure === "area" ? "none" : "area"); } },
     { id: "tool-import", icon: "⤒", label: t("map.import"), on: false, run: () => { setPanel(null); onImport(); } },
@@ -252,6 +254,9 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
     <>
       <View style={{ position: "absolute", left: 10, top: 10, right: compact ? 10 : 12, flexDirection: "row", flexWrap: "wrap", gap: compact ? 8 : 6, zIndex: 10 }} pointerEvents="box-none">
         <Pressable testID="btn-layers" onPress={() => toggle("layers")} style={chip(panel === "layers", compact)}><Text style={chipText(panel === "layers", compact)}>☰ {t("map.layers")}</Text></Pressable>
+        {searchContent && (
+          <Pressable testID="btn-search" onPress={() => toggle("search")} style={chip(panel === "search", compact)}><Text style={chipText(panel === "search", compact)}>🔎 {t("map.search")}</Text></Pressable>
+        )}
         {compact ? (
           <Pressable testID="btn-tools" onPress={() => toggle("tools")} style={chip(panel === "tools", compact)}><Text style={chipText(panel === "tools", compact)}>🛠 {t("map.tools")}</Text></Pressable>
         ) : (
@@ -261,6 +266,12 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
         )}
         {compact && measure !== "none" && <View style={chip(true, compact)}><Text style={chipText(true, compact)}>{t(`map.tool.${measure}`)}</Text></View>}
       </View>
+
+      {panel === "search" && searchContent && (
+        <Sheet title={t("map.searchTitle")} onClose={() => setPanel(null)} testID="search-sheet" closeTestID="search-close" wideStyle={{ width: 380, maxHeight: "90%" }}>
+          {searchContent}
+        </Sheet>
+      )}
 
       {compact && panel === "tools" && (
         <Sheet title={t("map.tools")} onClose={() => setPanel(null)} testID="tools-menu">

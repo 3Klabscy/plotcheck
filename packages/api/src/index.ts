@@ -13,6 +13,7 @@ import {
   type RestrictionHit,
 } from "@plotcheck/country-sdk";
 import { cached, type Cache } from "./cache.ts";
+import { googleTiles } from "./googleMaps.ts";
 import { limitConcurrency, RateLimiter } from "./limits.ts";
 import { BillingError, createBilling } from "./billing.ts";
 
@@ -215,6 +216,14 @@ export function createApi(deps: ApiDeps) {
     }
     if (req.method === "POST" && path === "/v1/billing/webhook/stripe") return billing.stripeWebhook(req);
     if (req.method === "GET" && path === "/v1/billing/jcc/return") return new Redirect((await billing.jccReturn(url)).redirect);
+
+    if (req.method === "GET" && path === "/v1/maps/google") {
+      try {
+        return await googleTiles(deps, url.searchParams.get("lang") === "en" ? "en" : "el");
+      } catch {
+        return { available: false };
+      }
+    }
 
     if (req.method === "GET" && path === "/v1/plot-index") {
       const c = getCountry(url.searchParams.get("country") ?? "");

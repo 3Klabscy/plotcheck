@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useLocalSearchParams } from "expo-router";
 import type { Parcel, UseType } from "@plotcheck/core";
@@ -15,7 +15,7 @@ import type { PriceChoice } from "../lib/options";
 import { AccountButton, SavedPlotsCard, SavePlotBar, SignInCard } from "../components/Account";
 import { useAccount, type SavedPlot } from "../lib/account";
 import { Paywall, SubscriptionLine } from "../components/Paywall";
-import type { AccessInfo } from "../lib/api";
+import type { AccessInfo, MapLayerDef } from "../lib/api";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -88,6 +88,19 @@ export default function Home() {
   }, []);
 
   const selected = useMemo(() => parcels.find((p) => p.nationalRef === selectedRef), [parcels, selectedRef]);
+
+  // Google basemaps (Map Tiles API), offered when the server has a Google key
+  const [googleLayers, setGoogleLayers] = useState<MapLayerDef[]>([]);
+  useEffect(() => {
+    api.googleTiles(i18n.language).then((g) => {
+      const keys = { roadmap: "map.googleRoadmap", satellite: "map.googleSatellite", hybrid: "map.googleHybrid" } as const;
+      setGoogleLayers(Object.entries(g.tiles ?? {}).map(([type, url]) => ({ id: `google-${type}`, kind: "xyz", role: "basemap", group: "basemap", titleKey: keys[type as keyof typeof keys], url: url!, attributionKey: "map.attribution.google", maxzoom: 22 }) as MapLayerDef));
+    }).catch(() => setGoogleLayers([]));
+  }, [i18n.language]);
+  const mapLayers = useMemo(() => {
+    const ls = config?.mapLayers ?? [];
+    return [...ls.filter((l) => l.role === "basemap"), ...googleLayers, ...ls.filter((l) => l.role !== "basemap")];
+  }, [config, googleLayers]);
   const result = analysis?.results.find((r) => r.use === use);
 
   // ---------- account: sign-in, saved plots, auto-save of the open saved plot ----------
@@ -378,6 +391,34 @@ export default function Home() {
   const zone = zones?.primary?.zone;
   const pc = zone?.publishedConstraints;
 
+  const plotSearch = (close?: () => void) => config && (
+    <PlotSearch
+        country={config.code}
+        region="4"
+        onFound={(p) => {
+          setTapped(undefined);
+          setCandidates(false);
+          setParcels([p]);
+          close?.();
+          void selectParcel(p);
+        }}
+        onCandidates={(ps) => {
+          setTapped(undefined);
+          setSelectedRef(undefined);
+          setParcels(ps);
+          setCandidates(true);
+          close?.();
+          const pts = ps.flatMap((p) => (p.geometry.type === "Polygon" ? p.geometry.coordinates.flat() : p.geometry.coordinates.flat(2)) as number[][]);
+          mapRef.current?.fitBounds([Math.min(...pts.map((c) => c[0]!)), Math.min(...pts.map((c) => c[1]!)), Math.max(...pts.map((c) => c[0]!)), Math.max(...pts.map((c) => c[1]!))]);
+        }}
+        onStreet={(st) => {
+          setTapped(undefined);
+          close?.();
+          mapRef.current?.fitBounds(st.bbox);
+        }}
+    />
+  );
+
   const panel = (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -427,28 +468,7 @@ export default function Home() {
               <Button title={t("btn.locate")} onPress={locate} kind="secondary" testID="locate" />
             </>
           ) : (
-            <PlotSearch
-              country={config.code}
-              region="4"
-              onFound={(p) => {
-                setTapped(undefined);
-                setCandidates(false);
-                setParcels([p]);
-                void selectParcel(p);
-              }}
-              onCandidates={(ps) => {
-                setTapped(undefined);
-                setSelectedRef(undefined);
-                setParcels(ps);
-                setCandidates(true);
-                const pts = ps.flatMap((p) => (p.geometry.type === "Polygon" ? p.geometry.coordinates.flat() : p.geometry.coordinates.flat(2)) as number[][]);
-                mapRef.current?.fitBounds([Math.min(...pts.map((c) => c[0]!)), Math.min(...pts.map((c) => c[1]!)), Math.max(...pts.map((c) => c[0]!)), Math.max(...pts.map((c) => c[1]!))]);
-              }}
-              onStreet={(st) => {
-                setTapped(undefined);
-                mapRef.current?.fitBounds(st.bbox);
-              }}
-            />
+            plotSearch()
           )}
         </Card>
       )}
@@ -467,6 +487,24 @@ export default function Home() {
             if (pts.length === 0) return null;
             const c = [pts.reduce((a, p) => a + p[0]!, 0) / pts.length, pts.reduce((a, p) => a + p[1]!, 0) / pts.length] as const;
             return <Row label={t("plot.coords", { grid: grid.name })} value={fmtGrid(c[0], c[1])} />;
+          })()}
+          {(() => {
+            const ring = (selected.geometry.type === "Polygon" ? selected.geometry.coordinates[0] : selected.geometry.coordinates[0]?.[0]) ?? [];
+            const pts = ring.slice(0, -1);
+            if (pts.length === 0) return null;
+            const ll = `${(pts.reduce((a, p) => a + p[1]!, 0) / pts.length).toFixed(6)},${(pts.reduce((a, p) => a + p[0]!, 0) / pts.length).toFixed(6)}`;
+            const link = (title: string, href: string, id: string) => (
+              <Pressable key={id} testID={id} accessibilityRole="link" onPress={() => void Linking.openURL(href)}
+                style={{ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 8, alignItems: "center", backgroundColor: colors.panel }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.accent, textAlign: "center" }}>{title}</Text>
+              </Pressable>
+            );
+            return (
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 8, marginBottom: 4 }}>
+                {link(`📍 ${t("plot.openGoogle")}`, `https://www.google.com/maps/search/?api=1&query=${ll}`, "google-open")}
+                {link(`🧭 ${t("plot.directions")}`, `https://www.google.com/maps/dir/?api=1&destination=${ll}`, "google-directions")}
+              </View>
+            );
           })()}
           {zones?.site && (
             <>
@@ -649,7 +687,7 @@ export default function Home() {
     <View style={{ flex: 1, position: "relative", minHeight: 280 }}>
       <PlotMap
         ref={mapRef}
-        layers={config.mapLayers}
+        layers={mapLayers}
         initialView={linkView ?? config.defaultView}
         selected={selected?.geometry}
         neighbours={step === "parcel" || (step === "tap" && candidates) ? neighbours : []}
@@ -688,6 +726,7 @@ export default function Home() {
         drawingsCount={drawings.features.length}
         onSaveMeasure={saveMeasure}
         onFindInView={findInView}
+        searchContent={plotSearch(() => setMapPanel(null))}
       />
       <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
       {mapPanel === "drawings" && drawings.features.length > 0 && (
@@ -702,7 +741,7 @@ export default function Home() {
       )}
       {mapPanel === "layers" && (
         <LayerPanel
-          layers={config.mapLayers}
+          layers={mapLayers}
           basemap={basemap ?? "streets"}
           overlays={overlays ?? []}
           onBasemap={setBasemap}

@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 /** Supabase Edge Function URL in production, local dev server otherwise. Never holds secrets. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
 
-export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "water" | "environment" | "infrastructure" | "admin" | "statistics";
 interface MapLayerBase { id: string; titleKey: string; group: MapLayerGroup; attributionKey: string; minzoom?: number; maxzoom?: number; opacity?: number; defaultOn?: boolean; date?: string; role: "basemap" | "overlay" }
 export type MapLayerDef =
   | (MapLayerBase & { kind: "xyz"; url: string })
@@ -173,6 +173,7 @@ export const api = {
   portal: () => call<{ url: string }>("/v1/billing/portal", { body: {} }),
   parcelsAtPoint: (lng: number, lat: number, signal?: AbortSignal) =>
     call<ParcelsResponse>("/v1/parcels/at-point", { body: { lng, lat }, signal }),
+  googleTiles: (lang: string) => call<{ available: boolean; tiles?: Partial<Record<"roadmap" | "satellite" | "hybrid", string>> }>(`/v1/maps/google?lang=${lang === "en" ? "en" : "el"}`),
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
   parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),

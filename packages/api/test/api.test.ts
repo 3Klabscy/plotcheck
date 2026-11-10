@@ -86,3 +86,25 @@ describe("plot search", () => {
     expect(c.countries[0].nationalGrid.epsg).toBe(6312);
   });
 });
+
+describe("Google basemaps", () => {
+  it("is off without a key", async () => {
+    expect(await (await api(new Request("http://x/v1/maps/google"))).json()).toEqual({ available: false });
+  });
+  it("creates Map Tiles API sessions with the key", async () => {
+    const bodies: unknown[] = [];
+    const gFetch = (async (url: string, init?: RequestInit) => {
+      if (String(url).startsWith("https://tile.googleapis.com/v1/createSession?key=K1")) {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ session: `S${bodies.length}`, expiry: "9999" }));
+      }
+      return new Response("nope", { status: 404 });
+    }) as typeof fetch;
+    const g = createApi({ fetch: gFetch, env: (k) => ({ GOOGLE_MAPS_API_KEY: "K1" })[k], cache: new MemoryCache(), countries: [cyprus] });
+    const r = await (await g(new Request("http://x/v1/maps/google?lang=en"))).json();
+    expect(r.available).toBe(true);
+    expect(Object.keys(r.tiles)).toEqual(["roadmap", "satellite", "hybrid"]);
+    expect(r.tiles.hybrid).toBe("https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=S3&key=K1");
+    expect(bodies[2]).toMatchObject({ mapType: "satellite", layerTypes: ["layerRoadmap"], region: "CY" });
+  });
+});
