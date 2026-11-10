@@ -14,6 +14,12 @@ export interface LayerChoices {
 }
 export interface AreaInfoRow { key: string; value: number; kind?: "count" | "percent" | "decimal" | "perKm2"; of?: number }
 export interface AreaInfo { areas: { levelKey: string; name: { el?: string; en?: string }; sections: { titleKey: string; rows: AreaInfoRow[] }[] }[]; sourceKey: string }
+export interface TerrainResponse {
+  cols: number; rows: number; x0: number; y0: number; dx: number; dy: number;
+  cellM: [number, number]; baseM: number; ground: string; surface?: string;
+  box: [number, number, number, number]; bufferM: number; source: string; sourceRef?: string;
+  geometry: Parcel["geometry"];
+}
 export interface LegendItem { label: string; image: string }
 export type MapLayerDef =
   | (MapLayerBase & { kind: "xyz"; url: string })
@@ -197,6 +203,8 @@ export const api = {
     call<GeoJSON.FeatureCollection & { interval?: number }>(`/v1/contours?country=${encodeURIComponent(country)}&bbox=${bbox.map((x) => x.toFixed(5)).join(",")}`, { signal }),
   streets: (country: string, q: string, signal?: AbortSignal) =>
     call<{ country: string; streets: StreetHit[] }>(`/v1/streets?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q)}`, { signal }),
+  terrain: (country: string, nationalRef: string, bufferM = 100, signal?: AbortSignal) =>
+    call<TerrainResponse>("/v1/terrain", { body: { country, nationalRef, bufferM }, signal }),
   zones: (country: string, nationalRef: string, signal?: AbortSignal) =>
     call<ZonesResponse>("/v1/zones", { body: { country, nationalRef }, signal }),
   analyse: (country: string, nationalRef: string, use: UseType | "all", params?: Partial<AnalysisParams>, signal?: AbortSignal) =>

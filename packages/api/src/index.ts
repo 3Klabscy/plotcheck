@@ -334,6 +334,18 @@ export function createApi(deps: ApiDeps) {
 
     if (path === "/v1/zones") return zonesFor(country, parcel, req.signal);
 
+    if (path === "/v1/terrain") {
+      if (!country.terrainModel) throw new HttpError(404, "terrain_not_supported");
+      const raw = b["bufferM"];
+      const bufferM = typeof raw === "number" && Number.isFinite(raw) ? Math.round(Math.min(200, Math.max(10, raw))) : 100;
+      const { value } = await cached(deps.cache, `terrain:${country.code}:${parcel.nationalRef}:${bufferM}`, TTL.parcel, async () => {
+        const t = await country.terrainModel!(ctx(req.signal), parcel, bufferM);
+        if (!t) throw new HttpError(404, "no_terrain");
+        return t;
+      });
+      return { ...value, geometry: parcel.geometry };
+    }
+
     if (path === "/v1/analyse") {
       const z = await zonesFor(country, parcel, req.signal);
       if (!z.primary) throw new HttpError(422, "no_zone", "No planning zone found for this plot");

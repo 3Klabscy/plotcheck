@@ -260,6 +260,8 @@ export interface ToolbarProps {
   onUndo(): void;
   /** Current map centre and zoom (to open the same view in Google Maps). */
   getView(): { lng: number; lat: number; zoom: number } | undefined;
+  /** Open the 3D view of the selected plot. */
+  on3d?(): void;
 }
 
 /** Google Maps links (official URL scheme; on phones they open the Google Maps app). */
@@ -277,7 +279,7 @@ export function centroid(p: Parcel): [number, number] {
   return [pts.reduce((a, c) => a + c[0]!, 0) / pts.length, pts.reduce((a, c) => a + c[1]!, 0) / pts.length];
 }
 
-export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView, searchContent, onUndo, getView }: ToolbarProps) {
+export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl, panel, setPanel, grid, onImport, drawingsCount, onSaveMeasure, onFindInView, searchContent, onUndo, getView, on3d }: ToolbarProps) {
   const { t, i18n } = useTranslation();
   const lng = i18n.language;
   const compact = useCompact();
@@ -312,6 +314,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
     { id: "btn-find", icon: "#", label: t("map.findHere"), on: panel === "find", run: () => toggle("find") },
     { id: "tool-distance", icon: "📏", label: t("map.tool.distance"), on: measure === "distance", run: () => { setPanel(null); onMeasure(measure === "distance" ? "none" : "distance"); } },
     { id: "tool-area", icon: "▱", label: t("map.tool.area"), on: measure === "area", run: () => { setPanel(null); onMeasure(measure === "area" ? "none" : "area"); } },
+    { id: "tool-3d", icon: "🏔", label: t("t3d.open"), on: false, run: () => { setPanel(null); on3d?.(); }, show: !!plot && !!on3d },
     { id: "tool-point", icon: "📍", label: t("map.tool.point"), on: measure === "point", run: () => { setPanel(null); onMeasure(measure === "point" ? "none" : "point"); } },
     { id: "tool-directions", icon: "🧭", label: t("map.tool.directions"), on: false, run: () => {
       setPanel(null);

@@ -17,6 +17,7 @@ import { useAccount, type SavedPlot } from "../lib/account";
 import { Paywall, SubscriptionLine } from "../components/Paywall";
 import type { AccessInfo, AreaInfo, MapLayerDef } from "../lib/api";
 import { AreaStatsSheet } from "../components/AreaStats";
+import { Terrain3D } from "../components/Terrain3D";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -110,6 +111,7 @@ export default function Home() {
   }, [config, googleLayers, choice]);
   // an overlay with figures behind it (census): taps on the map show those figures instead of picking a plot
   const infoLayer = mapLayers.find((l) => l.info && (overlays ?? []).includes(l.id));
+  const [show3d, setShow3d] = useState(false);
   const [areaStats, setAreaStats] = useState<{ loading: boolean; info?: AreaInfo; error?: string } | null>(null);
   const showAreaStats = async (p: { lng: number; lat: number }) => {
     if (!config || !infoLayer) return;
@@ -527,6 +529,10 @@ export default function Home() {
               </View>
             );
           })()}
+          <Pressable testID="open-3d" accessibilityRole="button" onPress={() => setShow3d(true)}
+            style={{ borderWidth: 1, borderColor: colors.accent, borderRadius: 8, paddingVertical: 10, alignItems: "center", marginTop: 4, marginBottom: 6, backgroundColor: colors.allowedBg }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.accent }}>🏔 {t("t3d.open")}</Text>
+          </Pressable>
           {zones?.site && (
             <>
               {zones.site.frontage.filter((f) => f.name).map((f) => (
@@ -752,6 +758,7 @@ export default function Home() {
         onFindInView={findInView}
         onUndo={() => mapRef.current?.undoMeasure()}
         getView={() => mapRef.current?.view()}
+        on3d={() => setShow3d(true)}
         searchContent={plotSearch(() => setMapPanel(null))}
       />
       {infoLayer && measure === "none" && mapPanel === null && !areaStats && (
@@ -764,6 +771,7 @@ export default function Home() {
           </View>
         </View>
       )}
+      {show3d && selected && <Terrain3D country={config.code} parcel={selected} onClose={() => setShow3d(false)} />}
       {areaStats && <AreaStatsSheet info={areaStats.info} loading={areaStats.loading} error={areaStats.error} onClose={() => { setAreaStats(null); setTapped(undefined); }} />}
       <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
       {mapPanel === "drawings" && drawings.features.length > 0 && (

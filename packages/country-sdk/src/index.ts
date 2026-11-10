@@ -202,6 +202,8 @@ export interface CountryModule {
   nationalGrid?: import("@plotcheck/core").NationalGrid;
   /** Contour lines (GeoJSON) over a small lat/lng box, for the map. */
   contours?(ctx: ProviderContext, bbox: [number, number, number, number]): Promise<unknown>;
+  /** Ground and surface heights of a plot and its surroundings (3D view). */
+  terrainModel?(ctx: ProviderContext, parcel: Parcel, bufferM: number): Promise<TerrainModel | undefined>;
   /** Figures (e.g. census) for the areas around a point, for an overlay marked `info`. */
   areaInfo?(ctx: ProviderContext, layerId: string, p: LngLat): Promise<AreaInfo | undefined>;
   /** Streets by name (address search). */
@@ -242,6 +244,32 @@ export interface LayerChoices {
   layers: Record<string, string>;
   /** Option id per dimension shown first. */
   initial: string[];
+}
+
+/**
+ * Heights around a plot for a 3D view. Grids are row-major from the north-west cell; cell (0,0) is
+ * centred at (x0, y0) degrees, cells are dx × dy degrees. Heights are decimetres above `baseM`,
+ * Int16 little-endian, base64; -32768 = no data.
+ */
+export interface TerrainModel {
+  cols: number;
+  rows: number;
+  x0: number;
+  y0: number;
+  dx: number;
+  dy: number;
+  /** Size of a cell in metres (east, north). */
+  cellM: [number, number];
+  baseM: number;
+  /** Ground (terrain model). */
+  ground: string;
+  /** Ground with buildings and trees (surface model), same cells. */
+  surface?: string;
+  /** The box shown: plot extent plus the buffer, [west, south, east, north]. */
+  box: [number, number, number, number];
+  bufferM: number;
+  source: string;
+  sourceRef?: string;
 }
 
 /** Figures for the areas around a point (statistics), from the finest level to the widest. */
