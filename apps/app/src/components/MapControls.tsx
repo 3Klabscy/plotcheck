@@ -72,7 +72,7 @@ export function Sheet({ title, onClose, testID, closeTestID, children, footer, w
   return <>{toRoot(sheet)}</>;
 }
 
-const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "environment", "infrastructure", "admin"];
+const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "water", "environment", "infrastructure", "admin", "statistics"];
 
 export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose }: { layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
   const { t } = useTranslation();
@@ -82,6 +82,7 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
   const row = { flexDirection: "row" as const, alignItems: "center" as const, gap: 12, minHeight: compact ? 48 : 34 };
   const text = { fontSize: compact ? 16 : 13, color: colors.ink, flex: 1 };
   const box = compact ? 22 : 16;
+  const [open, setOpen] = useState<string[]>(() => GROUPS.filter((g) => g === "cadastre" || layers.some((l) => l.group === g && overlays.includes(l.id))));
   return (
     <Sheet title={t("map.layers")} onClose={onClose} testID="layer-panel" closeTestID="layers-close">
       <Text style={groupTitle}>{t("map.group.basemap")}</Text>
@@ -96,10 +97,16 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
       {GROUPS.map((g) => {
         const ls = layers.filter((l) => l.role === "overlay" && l.group === g);
         if (ls.length === 0) return null;
+        const expanded = open.includes(g);
+        const active = ls.filter((l) => overlays.includes(l.id)).length;
         return (
           <View key={g}>
-            <Text style={groupTitle}>{t(`map.group.${g}`)}</Text>
-            {ls.map((l) => {
+            <Pressable testID={`group-${g}`} accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setOpen((o) => (expanded ? o.filter((x) => x !== g) : [...o, g]))}
+              style={{ flexDirection: "row", alignItems: "center", minHeight: compact ? 44 : 30, marginTop: 6 }}>
+              <Text style={[groupTitle, { flex: 1, marginTop: 0 }]}>{t(`map.group.${g}`)} · {ls.length}{active ? ` (${active} ✓)` : ""}</Text>
+              <Text style={{ fontSize: compact ? 18 : 14, color: colors.muted }}>{expanded ? "▾" : "▸"}</Text>
+            </Pressable>
+            {expanded && ls.map((l) => {
               const on = overlays.includes(l.id);
               return (
                 <Pressable key={l.id} testID={`overlay-${l.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => onToggle(l.id)} style={row}>

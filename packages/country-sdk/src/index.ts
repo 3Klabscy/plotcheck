@@ -210,7 +210,7 @@ export interface CountryModule {
   messages: Record<string, Record<string, string>>;
 }
 
-export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "environment" | "infrastructure" | "admin";
+export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "water" | "environment" | "infrastructure" | "admin" | "statistics";
 
 interface MapLayerBase {
   id: string;

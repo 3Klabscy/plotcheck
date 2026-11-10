@@ -66,8 +66,11 @@ describe("plot search", () => {
   it("lists map layers with names and groups", async () => {
     const c = await (await api(new Request("http://x/v1/countries"))).json();
     const layers = c.countries[0].mapLayers as { id: string; role: string; titleKey: string; group: string }[];
-    expect(layers.filter((l) => l.role === "basemap").map((l) => l.id)).toEqual(["cy-ortho-2019", "cy-ortho-2014", "cy-ortho-1993", "cy-ortho-1963"]);
+    expect(layers.filter((l) => l.role === "basemap").map((l) => l.id)).toEqual(["cy-ortho-2019", "cy-ortho-2014", "cy-satellite", "cy-ortho-1993", "cy-ortho-1963"]);
     expect(layers.every((l) => l.titleKey && l.group)).toBe(true);
+    // every public DLS group is offered (cadastre … statistics), each layer with a name
+    expect(new Set(layers.map((l) => l.group)).size).toBeGreaterThanOrEqual(10);
+    expect(layers.length).toBeGreaterThanOrEqual(70);
   });
   it("validates the contour box", async () => {
     const get = (q: string) => api(new Request(`http://x/v1/contours?country=CY&bbox=${q}`));
