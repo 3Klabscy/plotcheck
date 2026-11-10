@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { toRoot } from "../lib/portal";
+import { LayerLegend } from "./AreaStats";
 import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
 import { toGrid, type NationalGrid, type Parcel } from "@plotcheck/core";
@@ -74,7 +75,7 @@ export function Sheet({ title, onClose, testID, closeTestID, children, footer, w
 
 const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "water", "environment", "infrastructure", "admin", "statistics"];
 
-export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose, googleLocked }: { googleLocked?: boolean; layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
+export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onClose, googleLocked, country, choice, onChoice, zoom }: { country: string; choice: Record<string, string[]>; onChoice(layerId: string, sel: string[]): void; zoom?: number; googleLocked?: boolean; layers: MapLayerDef[]; basemap: string; overlays: string[]; onBasemap(id: string): void; onToggle(id: string): void; onClose(): void }) {
   const { t } = useTranslation();
   const compact = useCompact();
   const title = (l: MapLayerDef) => (l.date ? `${t(l.titleKey)} ${l.date}` : t(l.titleKey));
@@ -120,7 +121,7 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
             </Pressable>
             {expanded && ls.map((l) => {
               const on = overlays.includes(l.id);
-              return (
+              const row1 = (
                 <Pressable key={l.id} testID={`overlay-${l.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => onToggle(l.id)} style={row}>
                   <View style={{ width: box, height: box, borderRadius: 5, borderWidth: 2, borderColor: on ? colors.accent : colors.line, backgroundColor: on ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}>
                     {on && <Text style={{ color: "#fff", fontSize: compact ? 14 : 10, fontWeight: "900", lineHeight: compact ? 16 : 12 }}>✓</Text>}
@@ -128,6 +129,48 @@ export function LayerPanel({ layers, basemap, overlays, onBasemap, onToggle, onC
                   <Text style={text}>{title(l)}</Text>
                   {l.minzoom ? <Text style={{ fontSize: 11, color: colors.muted }}>{t("map.zoomIn")}</Text> : null}
                 </Pressable>
+              );
+              if (!on || !l.choices) return row1;
+              const c = l.choices;
+              const sel = choice[l.id] ?? c.initial;
+              return (
+                <View key={l.id}>
+                  {row1}
+                  <View testID={`choices-${l.id}`} style={{ marginLeft: box + 12, marginBottom: 8 }}>
+                    {c.dims.map((d, di) => (
+                      <View key={d.key} style={{ marginBottom: 6 }}>
+                        <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 3 }}>{t(d.titleKey)}</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                          {d.options.map((o) => {
+                            const trial = sel.map((x, k) => (k === di ? o.id : x));
+                            const ok = di === 0 ? Object.keys(c.layers).some((k) => k.startsWith(`${o.id}|`)) : !!c.layers[trial.join("|")];
+                            const active = sel[di] === o.id;
+                            return (
+                              <Pressable key={o.id} testID={`choice-${l.id}-${o.id}`} disabled={!ok}
+                                onPress={() => {
+                                  let next = trial;
+                                  if (!c.layers[next.join("|")]) {
+                                    // keep the chosen level; take the first indicator it has
+                                    const alt = c.dims[1]!.options.find((x) => c.layers[`${next[0]}|${x.id}`]);
+                                    if (alt) next = [next[0]!, alt.id];
+                                  }
+                                  onChoice(l.id, next);
+                                }}
+                                style={{ paddingHorizontal: 8, paddingVertical: compact ? 7 : 4, borderRadius: 999, borderWidth: 1, opacity: ok ? 1 : 0.35,
+                                  borderColor: active ? colors.accent : colors.line, backgroundColor: active ? colors.allowedBg : colors.panel }}>
+                                <Text style={{ fontSize: compact ? 13 : 11, fontWeight: active ? "700" : "400", color: active ? colors.accent : colors.ink }}>
+                                  {t(o.titleKey)}{o.minzoom && zoom !== undefined && zoom < o.minzoom ? " 🔍" : ""}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                    {l.legend && l.kind === "arcgis" && l.layers && <LayerLegend country={country} layer={l.id} layers={l.layers} />}
+                    {l.info && <Text style={{ fontSize: compact ? 13 : 11, color: colors.accent, marginTop: 6 }}>{t("map.statsTap")}</Text>}
+                  </View>
+                </View>
               );
             })}
           </View>

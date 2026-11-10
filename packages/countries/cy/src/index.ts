@@ -10,6 +10,7 @@ import { cyRestrictionLayers, larnacaNoiseFor } from "./restrictions.ts";
 import { larnacaStreetSearch } from "./larnaca/roads.ts";
 import { cyMapLayers } from "./mapLayers.ts";
 import { cyContours } from "./dls/contours.ts";
+import { cyPopulationAt } from "./dls/population.ts";
 import el from "./i18n/el.ts";
 import en from "./i18n/en.ts";
 
@@ -34,6 +35,7 @@ export const cyprus: CountryModule = {
   financeDefaults: cyFinanceDefaults,
   streetSearch: larnacaStreetSearch,
   contours: cyContours,
+  areaInfo: (ctx, layerId, p) => (layerId === "cy-population" ? cyPopulationAt(ctx, p) : Promise.resolve(undefined)),
   // CGRS93 / Cyprus LTM (EPSG:6312). Datum shift = EPSG:7721 reversed (coordinate frame), which is what
   // the DLS GeometryServer applies by default (ESRI 108128/108129); checked to < 5 mm, 2026-11-09.
   nationalGrid: {

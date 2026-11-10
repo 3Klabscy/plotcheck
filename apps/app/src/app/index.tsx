@@ -15,7 +15,8 @@ import type { PriceChoice } from "../lib/options";
 import { AccountButton, SavedPlotsCard, SavePlotBar, SignInCard } from "../components/Account";
 import { useAccount, type SavedPlot } from "../lib/account";
 import { Paywall, SubscriptionLine } from "../components/Paywall";
-import type { AccessInfo, MapLayerDef } from "../lib/api";
+import type { AccessInfo, AreaInfo, MapLayerDef } from "../lib/api";
+import { AreaStatsSheet } from "../components/AreaStats";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
 import type { MeasureResult, MeasureTool, PlotMapHandle } from "../components/PlotMap.types";
@@ -97,10 +98,30 @@ export default function Home() {
       setGoogleLayers(Object.entries(g.tiles ?? {}).map(([type, url]) => ({ id: `google-${type}`, kind: "xyz", role: "basemap", group: "basemap", titleKey: keys[type as keyof typeof keys], url: url!, attributionKey: "map.attribution.google", maxzoom: 22 }) as MapLayerDef));
     }).catch(() => setGoogleLayers([]));
   }, [i18n.language]);
+  // layers with pickers (e.g. census level × indicator) draw the chosen sublayers
+  const [choice, setChoice] = useState<Record<string, string[]>>({});
   const mapLayers = useMemo(() => {
-    const ls = config?.mapLayers ?? [];
+    const ls = (config?.mapLayers ?? []).map((l) => {
+      if (!l.choices || l.kind !== "arcgis") return l;
+      const pick = l.choices.layers[(choice[l.id] ?? l.choices.initial).join("|")];
+      return pick ? { ...l, layers: pick } : l;
+    });
     return [...ls.filter((l) => l.role === "basemap"), ...googleLayers, ...ls.filter((l) => l.role !== "basemap")];
-  }, [config, googleLayers]);
+  }, [config, googleLayers, choice]);
+  // an overlay with figures behind it (census): taps on the map show those figures instead of picking a plot
+  const infoLayer = mapLayers.find((l) => l.info && (overlays ?? []).includes(l.id));
+  const [areaStats, setAreaStats] = useState<{ loading: boolean; info?: AreaInfo; error?: string } | null>(null);
+  const showAreaStats = async (p: { lng: number; lat: number }) => {
+    if (!config || !infoLayer) return;
+    setTapped(p);
+    setMapPanel(null);
+    setAreaStats({ loading: true });
+    try {
+      setAreaStats({ loading: false, info: await api.areaInfo(config.code, infoLayer.id, p.lng, p.lat) });
+    } catch (e) {
+      setAreaStats({ loading: false, error: e instanceof ApiError ? e.code : "generic" });
+    }
+  };
   const result = analysis?.results.find((r) => r.use === use);
 
   // ---------- account: sign-in, saved plots, auto-save of the open saved plot ----------
@@ -703,6 +724,7 @@ export default function Home() {
         drawings={drawings}
         formatCursor={(x, y) => `${grid ? `${grid.name}  ${fmtGrid(x, y)}  ·  ` : ""}${y.toFixed(6)}, ${x.toFixed(6)}`}
         onTap={(p) => {
+          if (infoLayer && measure === "none") return void showAreaStats(p);
           setCandidates(false);
           void onTap(p);
         }}
@@ -732,6 +754,17 @@ export default function Home() {
         getView={() => mapRef.current?.view()}
         searchContent={plotSearch(() => setMapPanel(null))}
       />
+      {infoLayer && measure === "none" && mapPanel === null && !areaStats && (
+        <View testID="stats-banner" pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 76, bottom: 10, zIndex: 9, alignItems: "flex-start" }}>
+          <View style={{ backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.accent, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+            <Text style={{ fontSize: wide ? 13 : 15, color: colors.ink, fontWeight: "600" }}>{t("map.statsTap")}</Text>
+            <Pressable testID="stats-off" onPress={() => setOverlays((o) => (o ?? []).filter((x) => x !== infoLayer.id))}>
+              <Text style={{ fontSize: wide ? 13 : 15, color: colors.accent, fontWeight: "700" }}>{t("map.statsOff")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+      {areaStats && <AreaStatsSheet info={areaStats.info} loading={areaStats.loading} error={areaStats.error} onClose={() => { setAreaStats(null); setTapped(undefined); }} />}
       <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
       {mapPanel === "drawings" && drawings.features.length > 0 && (
         <DrawingsPanel
@@ -747,6 +780,10 @@ export default function Home() {
         <LayerPanel
           layers={mapLayers}
           googleLocked={googleLayers.length === 0}
+          country={config.code}
+          choice={choice}
+          onChoice={(id, sel) => setChoice((c) => ({ ...c, [id]: sel }))}
+          zoom={view.current?.zoom}
           basemap={basemap ?? "streets"}
           overlays={overlays ?? []}
           onBasemap={setBasemap}

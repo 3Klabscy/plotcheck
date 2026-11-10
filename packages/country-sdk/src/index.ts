@@ -202,6 +202,8 @@ export interface CountryModule {
   nationalGrid?: import("@plotcheck/core").NationalGrid;
   /** Contour lines (GeoJSON) over a small lat/lng box, for the map. */
   contours?(ctx: ProviderContext, bbox: [number, number, number, number]): Promise<unknown>;
+  /** Figures (e.g. census) for the areas around a point, for an overlay marked `info`. */
+  areaInfo?(ctx: ProviderContext, layerId: string, p: LngLat): Promise<AreaInfo | undefined>;
   /** Streets by name (address search). */
   streetSearch?(query: string, opts?: { limit?: number }): StreetHit[];
   /** Map basemaps / overlays offered to the client (all public, CORS-enabled sources). */
@@ -225,6 +227,39 @@ interface MapLayerBase {
   defaultOn?: boolean;
   /** Year or date of the data, shown next to the name (e.g. orthophoto epochs). */
   date?: string;
+  /** Pickers shown under the overlay when it is on (e.g. statistics level × indicator). */
+  choices?: LayerChoices;
+  /** Show the service's legend (ArcGIS /legend) for what is drawn. */
+  legend?: boolean;
+  /** Tapping the map while this overlay is on shows figures for the area (CountryModule.areaInfo). */
+  info?: boolean;
+}
+
+/** Dimensions to choose from; the chosen options, joined with "|", pick the ArcGIS sublayers in `layers`. */
+export interface LayerChoices {
+  dims: { key: string; titleKey: string; options: { id: string; titleKey: string; minzoom?: number }[] }[];
+  /** e.g. { "quarter|women25_64": "show:26" }; combinations not listed are not offered. */
+  layers: Record<string, string>;
+  /** Option id per dimension shown first. */
+  initial: string[];
+}
+
+/** Figures for the areas around a point (statistics), from the finest level to the widest. */
+export interface AreaInfo {
+  areas: {
+    levelKey: string;
+    name: { el?: string; en?: string };
+    sections: { titleKey: string; rows: AreaInfoRow[] }[];
+  }[];
+  sourceKey: string;
+}
+export interface AreaInfoRow {
+  key: string;
+  value: number;
+  /** count (default), percent (0–100), decimal (e.g. years, persons per household), perKm2 */
+  kind?: "count" | "percent" | "decimal" | "perKm2";
+  /** Total this row is a part of: the app shows the share and a bar. */
+  of?: number;
 }
 
 /**

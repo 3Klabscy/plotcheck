@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import maplibregl, { type GeoJSONSource, type Map as MLMap, type StyleSpecification } from "maplibre-gl";
+import maplibregl, { type GeoJSONSource, type Map as MLMap, type RasterTileSource, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { PolygonGeometry } from "@plotcheck/core";
 import type { MapLayerDef } from "../lib/api";
@@ -25,6 +25,10 @@ function wmsTiles(url: string, layers: string) {
 
 function arcgisTiles(url: string, layers?: string) {
   return `${url}/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=512,512&format=png32&transparent=true&f=image${layers ? `&layers=${encodeURIComponent(layers)}` : ""}`;
+}
+
+function tilesFor(l: Exclude<MapLayerDef, { kind: "contours" }>): string {
+  return l.kind === "xyz" ? l.url : l.kind === "wms" ? wmsTiles(l.url, l.layers) : arcgisTiles(l.url, l.layers);
 }
 
 function sourceFor(l: Exclude<MapLayerDef, { kind: "contours" }>): StyleSpecification["sources"][string] {
@@ -90,6 +94,8 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     },
   }));
   const measurePts = useRef<Pt[]>([]);
+  /** Tile URL each raster source was last given (layers whose sublayers can be picked change it). */
+  const tileUrls = useRef(new Map<string, string>());
   const dragging = useRef<number | null>(null);
   const justDragged = useRef(false);
   // phones send mouse events after a tap: no cursor readout or live line for those
@@ -103,6 +109,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     const sources: StyleSpecification["sources"] = {
       streets: { type: "raster", tiles: [STREETS.url], tileSize: 256, attribution: STREETS.attribution, maxzoom: 19 },
     };
+    for (const l of props.layers) if (l.kind !== "contours") tileUrls.current.set(l.id, tilesFor(l));
     for (const l of props.layers)
       sources[l.id] = l.kind === "contours"
         ? { type: "geojson", data: { type: "FeatureCollection", features: [] }, attribution: props.attribution(l.attributionKey) }
@@ -286,6 +293,13 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     m.setLayoutProperty("streets", "visibility", base === "streets" ? "visible" : "none");
     for (const l of p.layers) {
       if (!m.getLayer(l.id)) continue;
+      if (l.kind !== "contours") {
+        const url = tilesFor(l);
+        if (tileUrls.current.get(l.id) !== url) {
+          (m.getSource(l.id) as RasterTileSource | undefined)?.setTiles([url]);
+          tileUrls.current.set(l.id, url);
+        }
+      }
       const on = l.role === "basemap" ? l.id === base : p.overlays.includes(l.id);
       m.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
     }
@@ -329,7 +343,7 @@ export const PlotMap = forwardRef<PlotMapHandle, PlotMapProps>(function PlotMap(
     p.onMeasure?.({ tool, points: pts.length, coords: [...pts], lengthM: tool === "point" ? 0 : pathLengthM(pts, tool === "area"), areaM2: tool === "area" ? ringAreaM2(pts) : 0, segmentsM });
   }
 
-  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure, props.drawings]);
+  useEffect(sync, [props.selected, props.neighbours, props.footprint, props.basemap, props.overlays, props.tapped, props.measure, props.drawings, props.layers]);
   useEffect(refreshContours, [props.overlays]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     measurePts.current = [];

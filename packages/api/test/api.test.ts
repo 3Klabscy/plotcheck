@@ -70,7 +70,7 @@ describe("plot search", () => {
     expect(layers.every((l) => l.titleKey && l.group)).toBe(true);
     // every public DLS group is offered (cadastre … statistics), each layer with a name
     expect(new Set(layers.map((l) => l.group)).size).toBeGreaterThanOrEqual(10);
-    expect(layers.length).toBeGreaterThanOrEqual(70);
+    expect(layers.length).toBeGreaterThanOrEqual(65);
   });
   it("validates the contour box", async () => {
     const get = (q: string) => api(new Request(`http://x/v1/contours?country=CY&bbox=${q}`));

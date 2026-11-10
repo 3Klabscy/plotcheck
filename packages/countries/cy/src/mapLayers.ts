@@ -1,6 +1,7 @@
 import type { MapLayerDef } from "@plotcheck/country-sdk";
 import { DLS_BASE, DLS_INSPIRE } from "./dls/http.ts";
 import { PLANNING_ZONE_LAYER } from "./dls/zones.ts";
+import { PD_SERVICE, populationChoices } from "./dls/population.ts";
 
 const BASEMAPS = `${DLS_BASE}/arcgis/rest/services/BASEMAPS`;
 const svc = (name: string) => `${DLS_INSPIRE}/${name}/MapServer`;
@@ -104,13 +105,9 @@ export const cyMapLayers: MapLayerDef[] = [
   { id: "cy-su-quarter", kind: "arcgis", role: "overlay", group: "admin", titleKey: "cy.layer.suQuarter", url: svc("SU_StatisticalUnits"), layers: "show:2", attributionKey: "cy.attribution.dls", minzoom: 13, opacity: 0.5 },
   { id: "cy-postcodes", kind: "arcgis", role: "overlay", group: "admin", titleKey: "cy.layer.postcodes", url: svc("SU_StatisticalUnits"), layers: "show:3", attributionKey: "cy.attribution.dls", minzoom: 14, opacity: 0.5 },
 
-  // ---- population statistics (census choropleths by sex and age, drawn together) ----
-  { id: "cy-pd-district", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popDistrict", url: svc("PD_PopulationDistribution"), layers: "show:2,3,4,5,6,7,8,9", attributionKey: "cy.attribution.dls", opacity: 0.35 },
-  { id: "cy-pd-community", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popCommunity", url: svc("PD_PopulationDistribution"), layers: "show:11,12,13,14,15,16,17,18", attributionKey: "cy.attribution.dls", minzoom: 14, opacity: 0.35 },
-  { id: "cy-pd-quarter", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popQuarter", url: svc("PD_PopulationDistribution"), layers: "show:20,21,22,23,24,25,26,27", attributionKey: "cy.attribution.dls", minzoom: 15, opacity: 0.35 },
-  { id: "cy-pd-postcode", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popPostcode", url: svc("PD_PopulationDistribution"), layers: "show:29,30,31,32,33,34,35,36", attributionKey: "cy.attribution.dls", minzoom: 16, opacity: 0.35 },
-  { id: "cy-pd-employed", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popEmployed", url: svc("PD_PopulationDistribution"), layers: "show:39,40,42,43", attributionKey: "cy.attribution.dls", opacity: 0.35 },
-  { id: "cy-pd-unemployed", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popUnemployed", url: svc("PD_PopulationDistribution"), layers: "show:46,47,49,50", attributionKey: "cy.attribution.dls", opacity: 0.35 },
-  { id: "cy-pd-workplace", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.popWorkplace", url: svc("PD_PopulationDistribution"), layers: "show:53,54,55,56,57,58,60,61,62,63,64,65", attributionKey: "cy.attribution.dls", opacity: 0.35 },
+  // ---- population statistics (census 2011): one indicator at a time, tap the map for all the figures ----
+  { id: "cy-population", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.population", date: "2011",
+    url: PD_SERVICE, layers: populationChoices.layers[populationChoices.initial.join("|")]!, attributionKey: "cy.attribution.census", opacity: 0.55,
+    choices: populationChoices, legend: true, info: true },
   { id: "cy-crime", kind: "arcgis", role: "overlay", group: "statistics", titleKey: "cy.layer.crime", url: svc("SU_StatisticalUnits"), layers: "show:4", attributionKey: "cy.attribution.dls", minzoom: 13, opacity: 0.4 },
 ];

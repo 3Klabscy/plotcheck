@@ -6,7 +6,15 @@ import { supabase } from "./supabase";
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
 
 export type MapLayerGroup = "basemap" | "cadastre" | "terrain" | "planning" | "risk" | "water" | "environment" | "infrastructure" | "admin" | "statistics";
-interface MapLayerBase { id: string; titleKey: string; group: MapLayerGroup; attributionKey: string; minzoom?: number; maxzoom?: number; opacity?: number; defaultOn?: boolean; date?: string; role: "basemap" | "overlay" }
+interface MapLayerBase { id: string; titleKey: string; group: MapLayerGroup; attributionKey: string; minzoom?: number; maxzoom?: number; opacity?: number; defaultOn?: boolean; date?: string; role: "basemap" | "overlay"; choices?: LayerChoices; legend?: boolean; info?: boolean }
+export interface LayerChoices {
+  dims: { key: string; titleKey: string; options: { id: string; titleKey: string; minzoom?: number }[] }[];
+  layers: Record<string, string>;
+  initial: string[];
+}
+export interface AreaInfoRow { key: string; value: number; kind?: "count" | "percent" | "decimal" | "perKm2"; of?: number }
+export interface AreaInfo { areas: { levelKey: string; name: { el?: string; en?: string }; sections: { titleKey: string; rows: AreaInfoRow[] }[] }[]; sourceKey: string }
+export interface LegendItem { label: string; image: string }
 export type MapLayerDef =
   | (MapLayerBase & { kind: "xyz"; url: string })
   | (MapLayerBase & { kind: "wms"; url: string; layers: string })
@@ -173,6 +181,10 @@ export const api = {
   portal: () => call<{ url: string }>("/v1/billing/portal", { body: {} }),
   parcelsAtPoint: (lng: number, lat: number, signal?: AbortSignal) =>
     call<ParcelsResponse>("/v1/parcels/at-point", { body: { lng, lat }, signal }),
+  areaInfo: (country: string, layer: string, lng: number, lat: number) =>
+    call<AreaInfo>(`/v1/area-info?country=${encodeURIComponent(country)}&layer=${encodeURIComponent(layer)}&lng=${lng.toFixed(6)}&lat=${lat.toFixed(6)}`),
+  mapLegend: (country: string, layer: string, layers: string) =>
+    call<{ items: LegendItem[] }>(`/v1/map-legend?country=${encodeURIComponent(country)}&layer=${encodeURIComponent(layer)}&layers=${encodeURIComponent(layers)}`),
   googleTiles: (lang: string) => call<{ available: boolean; tiles?: Partial<Record<"roadmap" | "satellite" | "hybrid", string>> }>(`/v1/maps/google?lang=${lang === "en" ? "en" : "el"}`),
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
   parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>

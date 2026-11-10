@@ -14,6 +14,7 @@ import {
 } from "@plotcheck/country-sdk";
 import { cached, type Cache } from "./cache.ts";
 import { googleTiles } from "./googleMaps.ts";
+import { arcgisLegend } from "./legend.ts";
 import { limitConcurrency, RateLimiter } from "./limits.ts";
 import { BillingError, createBilling } from "./billing.ts";
 
@@ -216,6 +217,26 @@ export function createApi(deps: ApiDeps) {
     }
     if (req.method === "POST" && path === "/v1/billing/webhook/stripe") return billing.stripeWebhook(req);
     if (req.method === "GET" && path === "/v1/billing/jcc/return") return new Redirect((await billing.jccReturn(url)).redirect);
+
+    if (req.method === "GET" && path === "/v1/area-info") {
+      const c = getCountry(url.searchParams.get("country") ?? "");
+      const layer = url.searchParams.get("layer") ?? "";
+      const lng = Number(url.searchParams.get("lng")), lat = Number(url.searchParams.get("lat"));
+      if (!isNum(lng, -180, 180) || !isNum(lat, -90, 90)) throw new HttpError(400, "invalid_point");
+      const def = c.mapLayers.find((l) => l.id === layer);
+      if (!def?.info || !c.areaInfo) throw new HttpError(404, "no_area_info");
+      const key = `area-info:${c.code}:${layer}:${lng.toFixed(4)},${lat.toFixed(4)}`;
+      const { value } = await cached(deps.cache, key, 7 * 24 * 3600, async () => (await c.areaInfo!(ctx(req.signal), layer, { lng, lat })) ?? { areas: [], sourceKey: "" });
+      return value;
+    }
+
+    if (req.method === "GET" && path === "/v1/map-legend") {
+      const c = getCountry(url.searchParams.get("country") ?? "");
+      const def = c.mapLayers.find((l) => l.id === (url.searchParams.get("layer") ?? ""));
+      if (!def || !def.legend || def.kind !== "arcgis") throw new HttpError(404, "no_legend");
+      const ids = /^show:([\d,]{1,200})$/.exec(url.searchParams.get("layers") ?? "")?.[1]?.split(",").map(Number) ?? [];
+      return { items: await arcgisLegend(deps, def.url, ids) };
+    }
 
     if (req.method === "GET" && path === "/v1/maps/google") {
       try {
