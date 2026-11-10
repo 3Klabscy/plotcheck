@@ -34,5 +34,6 @@ describe("census figures (DLS PD service)", () => {
   it("tidies legend labels", () => {
     expect(tidyLabel("66,000001 - 220,000000")).toBe("67 – 220");
     expect(tidyLabel("0,000000 - 66,000000")).toBe("0 – 66");
+    expect(tidyLabel("0,000000")).toBe("0");
   });
 });

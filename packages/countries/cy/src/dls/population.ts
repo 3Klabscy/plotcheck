@@ -43,14 +43,14 @@ function buildChoices(): LayerChoices {
     dims: [
       { key: "level", titleKey: "cy.stats.level", options: [
         { id: "district", titleKey: "cy.stats.lvl.district" },
-        { id: "community", titleKey: "cy.stats.lvl.community", minzoom: 14 },
-        { id: "quarter", titleKey: "cy.stats.lvl.quarter", minzoom: 15 },
-        { id: "postcode", titleKey: "cy.stats.lvl.postcode", minzoom: 16 },
+        { id: "community", titleKey: "cy.stats.lvl.community", minzoom: 13 },
+        { id: "quarter", titleKey: "cy.stats.lvl.quarter", minzoom: 14 },
+        { id: "postcode", titleKey: "cy.stats.lvl.postcode", minzoom: 15 },
       ] },
       { key: "indicator", titleKey: "cy.stats.indicator", options: ind },
     ],
     layers,
-    initial: ["community", "women25_64"],
+    initial: ["quarter", "women25_64"],
   };
 }
 export const populationChoices = buildChoices();

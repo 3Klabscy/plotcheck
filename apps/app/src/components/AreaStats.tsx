@@ -79,11 +79,11 @@ export function LayerLegend({ country, layer, layers }: { country: string; layer
   return (
     <View testID={`legend-${layer}`} style={{ marginTop: 6 }}>
       <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 2 }}>{t("map.legend")}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 8, rowGap: 3 }}>
         {items.map((x) => (
           <View key={x.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Image source={{ uri: x.image }} style={{ width: 16, height: 16, borderRadius: 3 }} />
-            <Text style={{ fontSize: 12, color: colors.ink }}>{x.label}</Text>
+            <Image source={{ uri: x.image }} style={{ width: 14, height: 14, borderRadius: 3 }} />
+            <Text style={{ fontSize: 11, color: colors.ink }}>{x.label}</Text>
           </View>
         ))}
       </View>

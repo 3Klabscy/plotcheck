@@ -12,6 +12,11 @@ interface ArcgisLegend {
 
 /** "0,000000 - 66,000000" → "0 – 66"; "66,000001 - 220,000000" → "67 – 220" (counts are whole numbers). */
 export function tidyLabel(label: string): string {
+  const one = /^\s*([\d.,]+)\s*$/.exec(label);
+  if (one) {
+    const v = Number(one[1]!.replace(",", "."));
+    return Number.isFinite(v) ? String(Math.round(v)) : label.trim();
+  }
   const m = /^\s*([\d.,]+)\s*-\s*([\d.,]+)\s*$/.exec(label);
   if (!m) return label.trim();
   const num = (s: string) => Number(s.replace(",", "."));

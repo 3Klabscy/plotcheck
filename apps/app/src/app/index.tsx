@@ -16,7 +16,7 @@ import { AccountButton, SavedPlotsCard, SavePlotBar, SignInCard } from "../compo
 import { useAccount, type SavedPlot } from "../lib/account";
 import { Paywall, SubscriptionLine } from "../components/Paywall";
 import type { AccessInfo, AreaInfo, MapLayerDef } from "../lib/api";
-import { AreaStatsSheet } from "../components/AreaStats";
+import { AreaStatsSheet, LayerLegend } from "../components/AreaStats";
 import { Terrain3D } from "../components/Terrain3D";
 import { toGrid } from "@plotcheck/core";
 import { allPositions, feature, importFile, ImportError, type UserCollection, type UserFeature } from "../lib/userLayer";
@@ -112,6 +112,7 @@ export default function Home() {
   // an overlay with figures behind it (census): taps on the map show those figures instead of picking a plot
   const infoLayer = mapLayers.find((l) => l.info && (overlays ?? []).includes(l.id));
   const [show3d, setShow3d] = useState(false);
+  const [statsNote, setStatsNote] = useState(false);
   const [areaStats, setAreaStats] = useState<{ loading: boolean; info?: AreaInfo; error?: string } | null>(null);
   const showAreaStats = async (p: { lng: number; lat: number }) => {
     if (!config || !infoLayer) return;
@@ -762,16 +763,41 @@ export default function Home() {
         on3d={() => setShow3d(true)}
         searchContent={plotSearch(() => setMapPanel(null))}
       />
-      {infoLayer && measure === "none" && mapPanel === null && !areaStats && (
-        <View testID="stats-banner" pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 76, bottom: 10, zIndex: 9, alignItems: "flex-start" }}>
-          <View style={{ backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.accent, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-            <Text style={{ fontSize: wide ? 13 : 15, color: colors.ink, fontWeight: "600" }}>{t("map.statsTap")}</Text>
-            <Pressable testID="stats-off" onPress={() => setOverlays((o) => (o ?? []).filter((x) => x !== infoLayer.id))}>
-              <Text style={{ fontSize: wide ? 13 : 15, color: colors.accent, fontWeight: "700" }}>{t("map.statsOff")}</Text>
-            </Pressable>
+      {infoLayer && measure === "none" && mapPanel === null && !areaStats && (() => {
+        const sel = infoLayer.choices ? (choice[infoLayer.id] ?? infoLayer.choices.initial) : [];
+        const optTitle = (di: number) => {
+          const o = infoLayer.choices?.dims[di]?.options.find((x) => x.id === sel[di]);
+          return o ? t(o.titleKey) : "";
+        };
+        return (
+          <View testID="stats-banner" pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 76, bottom: 10, zIndex: 9, alignItems: "flex-start" }}>
+            <View style={{ backgroundColor: "rgba(255,255,255,0.97)", borderRadius: 12, padding: wide ? 10 : 8, borderWidth: 1, borderColor: colors.accent, maxWidth: 420 }}>
+              {!wide && <Text style={{ fontSize: 12, color: colors.ink, fontWeight: "600", marginBottom: 2 }}>{t("map.statsTap")}</Text>}
+              {infoLayer.choices && (
+                <Text testID="stats-legend-title" style={{ fontSize: 13, fontWeight: "800", color: colors.ink }}>
+                  {t("map.statsShowing", { what: optTitle(1), level: optTitle(0) })}
+                </Text>
+              )}
+              {infoLayer.kind === "arcgis" && infoLayer.legend && infoLayer.layers && <LayerLegend country={config.code} layer={infoLayer.id} layers={infoLayer.layers} />}
+              {(wide || statsNote) && <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{t("map.statsColoursNote")}</Text>}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 6 }}>
+                {wide && <Text style={{ fontSize: 13, color: colors.ink, fontWeight: "600" }}>{t("map.statsTap")}</Text>}
+                {!wide && (
+                  <Pressable testID="stats-note" onPress={() => setStatsNote((x) => !x)}>
+                    <Text style={{ fontSize: 13, color: colors.accent, fontWeight: "700" }}>ⓘ</Text>
+                  </Pressable>
+                )}
+                <Pressable testID="stats-change" onPress={() => setMapPanel("layers")}>
+                  <Text style={{ fontSize: 13, color: colors.accent, fontWeight: "700" }}>{t("map.statsChange")}</Text>
+                </Pressable>
+                <Pressable testID="stats-off" onPress={() => setOverlays((o) => (o ?? []).filter((x) => x !== infoLayer.id))}>
+                  <Text style={{ fontSize: 13, color: colors.accent, fontWeight: "700" }}>{t("map.statsOff")}</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
-        </View>
-      )}
+        );
+      })()}
       {show3d && selected && <Terrain3D country={config.code} parcel={selected} onClose={() => setShow3d(false)} />}
       {areaStats && <AreaStatsSheet info={areaStats.info} loading={areaStats.loading} error={areaStats.error} onClose={() => { setAreaStats(null); setTapped(undefined); }} />}
       <MapFabs onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} onLocate={locate} />
