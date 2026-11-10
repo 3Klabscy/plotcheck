@@ -1,0 +1,37 @@
+plugins { id "com.android.application" }
+
+// Test shell for the web app: the URL of the test deployment is set here (or with -PappUrl=…).
+def appUrl = project.findProperty("appUrl") ?: "https://plotcheck-test.netlify.app/"
+
+android {
+    namespace "com.plotcheck.test"
+    compileSdk 35
+    defaultConfig {
+        applicationId "com.plotcheck.test"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "0.1-test"
+        buildConfigField "String", "APP_URL", "\"${appUrl}\""
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        test {
+            // Test signing key, kept outside the repository (see apps/android/README.md).
+            storeFile file(System.getenv("PLOTCHECK_KEYSTORE") ?: "../keystore/test.jks")
+            storePassword System.getenv("PLOTCHECK_KEYSTORE_PASSWORD") ?: ""
+            keyAlias "plotcheck-test"
+            keyPassword System.getenv("PLOTCHECK_KEYSTORE_PASSWORD") ?: ""
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.test
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

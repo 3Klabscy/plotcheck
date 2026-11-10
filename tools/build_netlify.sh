@@ -4,6 +4,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 (cd apps/app && EXPO_PUBLIC_API_URL="" npx expo export --platform web --output-dir ../../deploy/dist-web)
 printf '/*  /index.html  200\n' > deploy/dist-web/_redirects
+cp deploy/extra/android.html deploy/dist-web/android.html
+# Android test app, if built (apps/android, see its README)
+APK=apps/android/app/build/outputs/apk/release/app-release.apk
+[ -f "$APK" ] && cp "$APK" deploy/dist-web/plotcheck-test.apk
 node_modules/.bin/esbuild deploy/api-entry.mts --bundle --platform=node --format=esm --target=node20 \
   --outfile=deploy/netlify/functions/api.mjs --log-level=warning \
   --banner:js="import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);"
