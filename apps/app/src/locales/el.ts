@@ -317,6 +317,8 @@ const el: Record<string, string> = {
   "map.statsShowing": "Χρώματα: {{what}} ανά {{level}} (2011)",
   "map.statsColoursNote": "Πόσα άτομα αυτής της ομάδας μένουν σε κάθε περιοχή — όχι πυκνότητα· οι μεγάλες περιοχές βγαίνουν πιο σκούρες.",
   "map.statsChange": "Αλλαγή",
+  "map.sheetDown": "Κατέβασμα",
+  "map.sheetUp": "Επάνω",
   "map.layers": "Επίπεδα",
   "map.blank": "Χωρίς υπόβαθρο",
   "map.close": "Κλείσιμο",

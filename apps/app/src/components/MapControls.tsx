@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toRoot } from "../lib/portal";
 import { LayerLegend } from "./AreaStats";
-import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
+import { Animated, Linking, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
 import { toGrid, type NationalGrid, type Parcel } from "@plotcheck/core";
 import { allPositions, feature, toDxf, toGeoJson, toKml, type UserCollection, type UserFeature } from "../lib/userLayer";
@@ -58,20 +58,102 @@ export function Sheet({ title, onClose, testID, closeTestID, children, footer, w
         {footer}
       </View>
     );
-  // rendered at the root of the page: nothing in the layout (side panel, cards) can cover it
-  const sheet = (
-    <View style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, zIndex: 1000, justifyContent: "flex-end" }]}>
-      <Pressable style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)" }]} onPress={onClose} accessibilityLabel={t("map.close")} />
-      <View testID={testID} style={{ backgroundColor: colors.panel, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: Math.round(height * 0.85), paddingBottom: 12, ...shadow }}>
-        <View style={{ alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginTop: 8 }} />
-        {header}
-        <ScrollView style={{ paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 8 }}>{children}</ScrollView>
+  return <>{toRoot(<BottomSheet title={title} header={header} testID={testID} maxHeight={Math.round(height * 0.85)} footer={footer}>{children}</BottomSheet>)}</>;
+}
+
+/** Height left showing when a sheet is pulled down: the handle and the title bar. */
+const PEEK = 74;
+
+/**
+ * Phone panel that can be pulled down out of the way (the map stays usable) and pulled back up,
+ * keeping everything as it was. Drag the title bar, or drag the list down when it is at the top;
+ * tap the lowered bar or the dimmed map to switch between the two. ✕ closes it.
+ */
+function BottomSheet({ title, header, testID, maxHeight, footer, children }: { title: string; header: ReactNode; testID: string; maxHeight: number; footer?: ReactNode; children: ReactNode }) {
+  const { t } = useTranslation();
+  const [down, setDown] = useState(false);
+  const [h, setH] = useState(0);
+  const y = useRef(new Animated.Value(0)).current;
+  const scrollY = useRef(0);
+  const state = useRef({ down: false, h: 0 });
+  state.current = { down, h };
+  const travel = () => Math.max(0, state.current.h - PEEK);
+  const snap = (toDown: boolean) => {
+    setDown(toDown);
+    Animated.spring(y, { toValue: toDown ? travel() : 0, useNativeDriver: false, bounciness: 2, speed: 18 }).start();
+  };
+  // keep the lowered position right when the sheet's height changes (e.g. a group opened)
+  useEffect(() => { if (down) y.setValue(travel()); }, [h]); // eslint-disable-line react-hooks/exhaustive-deps
+  const responder = () =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
+      onPanResponderMove: (_e, g) => {
+        const start = state.current.down ? travel() : 0;
+        y.setValue(Math.min(travel(), Math.max(0, start + g.dy)));
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (state.current.down) snap(!(g.dy < -40 || g.vy < -0.4));
+        else snap(g.dy > 80 || g.vy > 0.5);
+      },
+      onPanResponderTerminate: () => snap(state.current.down),
+    });
+  const headerPan = useMemo(() => responder(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // the list scrolls natively in the browser: pulling it down while it is at the top lowers the sheet
+  const listRef = useRef<unknown>(null);
+  useEffect(() => {
+    const el = listRef.current as unknown as HTMLElement | null;
+    if (Platform.OS !== "web" || !el?.addEventListener) return;
+    let y0 = 0, t0 = 0, active = false, last = 0;
+    const start = (e: TouchEvent) => { y0 = e.touches[0]!.clientY; t0 = Date.now(); active = false; last = 0; };
+    const move = (e: TouchEvent) => {
+      if (state.current.down) return;
+      const dy = e.touches[0]!.clientY - y0;
+      if (!active && dy > 10 && scrollY.current <= 0) active = true;
+      if (!active) return;
+      e.preventDefault();
+      last = dy;
+      y.setValue(Math.min(travel(), Math.max(0, dy)));
+    };
+    const end = () => {
+      if (!active) return;
+      active = false;
+      const v = last / Math.max(1, Date.now() - t0);
+      snap(last > 80 || v > 0.5);
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <View pointerEvents="box-none" style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, zIndex: 1000, justifyContent: "flex-end" }]}>
+      {!down && <Pressable style={[fixed, { left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.25)" }]} onPress={() => snap(true)} accessibilityLabel={t("map.sheetDown")} testID={`${testID}-backdrop`} />}
+      <Animated.View testID={testID} onLayout={(e) => setH(e.nativeEvent.layout.height)}
+        style={{ backgroundColor: colors.panel, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight, paddingBottom: 12, ...shadow, transform: [{ translateY: y }] }}>
+        <View {...headerPan.panHandlers}>
+          <Pressable onPress={() => snap(!down)} accessibilityRole="button" accessibilityLabel={down ? t("map.sheetUp") : t("map.sheetDown")} testID={`${testID}-handle`}
+            style={{ alignItems: "center", paddingTop: 8, paddingBottom: 2 }}>
+            <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
+          </Pressable>
+          {header}
+          {down && <Text style={{ position: "absolute", right: 64, top: 34, fontSize: 13, color: colors.accent, fontWeight: "700" }} accessibilityLabel={title}>▲ {t("map.sheetUp")}</Text>}
+        </View>
+        <View ref={listRef as never} style={{ flexShrink: 1 }}>
+          <ScrollView style={{ paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 8 }} scrollEventThrottle={16}
+            onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}>{children}</ScrollView>
+        </View>
         {footer}
-      </View>
+      </Animated.View>
     </View>
   );
-  return <>{toRoot(sheet)}</>;
 }
+
 
 const GROUPS: MapLayerGroup[] = ["cadastre", "terrain", "planning", "risk", "water", "environment", "infrastructure", "admin", "statistics"];
 

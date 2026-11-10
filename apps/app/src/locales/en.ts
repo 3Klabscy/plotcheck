@@ -317,6 +317,8 @@ const en: Record<string, string> = {
   "map.statsShowing": "Colours: {{what}} per {{level}} (2011)",
   "map.statsColoursNote": "How many people of this group live in each area — not density; larger areas come out darker.",
   "map.statsChange": "Change",
+  "map.sheetDown": "Lower",
+  "map.sheetUp": "Up",
   "map.layers": "Layers",
   "map.blank": "No basemap",
   "map.close": "Close",
