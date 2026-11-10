@@ -103,6 +103,13 @@ PORT=8080 STATIC_DIR=$PWD/dist-web npx tsx apps/api-dev/src/server.ts
 
 Without Supabase settings everything is unlocked and there is no sign-in.
 
+## Test deployment (Netlify)
+
+`tools/build_netlify.sh` builds `deploy/`: the web app (`deploy/dist-web`) and the API as one Netlify
+Function (`deploy/netlify/functions/api.mjs`, served at `/v1/*`, region Frankfurt). The test site
+is `plotcheck-test` (password-protected in Netlify's visitor access settings). Without Supabase
+settings everything is unlocked.
+
 ## Accounts (Supabase Auth)
 
 Sign-in is by a 6-digit code sent by e-mail (no passwords). Each user keeps "My plots": the plot,

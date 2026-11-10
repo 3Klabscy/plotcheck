@@ -9,3 +9,6 @@ web-build/
 coverage/
 *.tsbuildinfo
 dist-web
+deploy/dist-web
+deploy/netlify/functions/api.mjs
+deploy/.netlify

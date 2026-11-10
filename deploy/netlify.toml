@@ -1,0 +1,8 @@
+# Test deployment: the web app (dist-web, built with EXPO_PUBLIC_API_URL="") and the API as one
+# Netlify Function (netlify/functions/api.mjs, prebundled, served at /v1/*). Built by tools/build_netlify.sh.
+[build]
+  publish = "dist-web"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
