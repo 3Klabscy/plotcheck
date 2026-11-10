@@ -267,6 +267,7 @@ export interface ToolbarProps {
 /** Google Maps links (official URL scheme; on phones they open the Google Maps app). */
 export const googleMaps = {
   place: (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`,
+  streetView: (lat: number, lng: number) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lng.toFixed(6)}`,
   directions: (lat: number, lng: number) => `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lng.toFixed(6)}`,
   view: (lat: number, lng: number, zoom: number, satellite: boolean) =>
     `https://www.google.com/maps/@?api=1&map_action=map&center=${lat.toFixed(6)},${lng.toFixed(6)}&zoom=${Math.round(Math.min(21, Math.max(3, zoom)))}${satellite ? "&basemap=satellite" : ""}`,
@@ -416,6 +417,7 @@ export function MapToolbar({ measure, onMeasure, onClear, result, plot, shareUrl
                 })()}
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
                   <Pressable testID="point-google" onPress={() => openUrl(googleMaps.place(result.coords[0]![1], result.coords[0]![0]))} style={linkBtn(compact)}><Text style={linkText(compact)}>📍 {t("map.googleOpen")}</Text></Pressable>
+                  <Pressable testID="point-streetview" onPress={() => openUrl(googleMaps.streetView(result.coords[0]![1], result.coords[0]![0]))} style={linkBtn(compact)}><Text style={linkText(compact)}>🚶 {t("plot.streetView")}</Text></Pressable>
                   <Pressable testID="point-directions" onPress={() => openUrl(googleMaps.directions(result.coords[0]![1], result.coords[0]![0]))} style={linkBtn(compact)}><Text style={linkText(compact)}>🧭 {t("map.googleDirections")}</Text></Pressable>
                 </View>
               </View>

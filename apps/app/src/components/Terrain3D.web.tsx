@@ -430,6 +430,7 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             <Pressable testID="t3d-reset" onPress={() => view.current?.reset()} style={chip(false)}><Text style={chipText(false)}>⟲ {t("t3d.reset")}</Text></Pressable>
             <Pressable testID="t3d-png" onPress={savePng} style={chip(false)}><Text style={chipText(false)}>🖼 {t("t3d.png")}</Text></Pressable>
+            <Pressable testID="t3d-streetview" onPress={() => { const r = rings(parcel.geometry)[0]!.slice(0, -1); window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${(r.reduce((a, p) => a + p[1]!, 0) / r.length).toFixed(6)},${(r.reduce((a, p) => a + p[0]!, 0) / r.length).toFixed(6)}`, "_blank"); }} style={chip(false)}><Text style={chipText(false)}>🚶 {t("plot.streetView")}</Text></Pressable>
             <Pressable testID="t3d-glb" onPress={saveGlb} style={chip(false)}><Text style={chipText(false)}>{busy === "glb" ? "…" : "🧊"} {t("t3d.glb")}</Text></Pressable>
           </View>
           <Text style={{ fontSize: 11, color: colors.ink, backgroundColor: "rgba(255,255,255,0.8)", alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>

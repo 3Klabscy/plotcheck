@@ -301,6 +301,7 @@ const el: Record<string, string> = {
   "t3d.around": "+{{m}} μ. γύρω",
   "t3d.hint": "Σύρετε για περιστροφή, τσιμπήστε/τροχός για ζουμ",
   "t3d.credit": "DTM/DSM 2019 και ορθοφωτοχάρτης 2019 © ΤΚΧ",
+  "plot.streetView": "Street View",
   "map.layers": "Επίπεδα",
   "map.blank": "Χωρίς υπόβαθρο",
   "map.close": "Κλείσιμο",

@@ -526,6 +526,7 @@ export default function Home() {
               <View style={{ flexDirection: "row", gap: 8, marginTop: 8, marginBottom: 4 }}>
                 {link(`📍 ${t("plot.openGoogle")}`, `https://www.google.com/maps/search/?api=1&query=${ll}`, "google-open")}
                 {link(`🧭 ${t("plot.directions")}`, `https://www.google.com/maps/dir/?api=1&destination=${ll}`, "google-directions")}
+                {link(`🚶 ${t("plot.streetView")}`, `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll}`, "google-streetview")}
               </View>
             );
           })()}

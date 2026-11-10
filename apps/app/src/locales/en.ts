@@ -301,6 +301,7 @@ const en: Record<string, string> = {
   "t3d.around": "+{{m}} m around",
   "t3d.hint": "Drag to rotate, pinch/scroll to zoom",
   "t3d.credit": "DTM/DSM 2019 and orthophoto 2019 © DLS Cyprus",
+  "plot.streetView": "Street View",
   "map.layers": "Layers",
   "map.blank": "No basemap",
   "map.close": "Close",
