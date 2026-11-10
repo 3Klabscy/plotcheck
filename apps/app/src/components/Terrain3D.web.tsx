@@ -120,7 +120,101 @@ function stats(m: Model, plot: Parcel) {
         if (m.surface) tall = Math.max(tall, m.surface[r * cols + c]! - g);
       }
     }
-  return { pMin, pMax, aMin, aMax, tall };
+  // surveyed buildings standing on the plot (centre inside it)
+  const onPlot = (m.t.buildings ?? []).filter((b) => {
+    const r = b.rings[0]!.slice(0, -1);
+    const x = r.reduce((a, p) => a + p[0], 0) / r.length, y = r.reduce((a, p) => a + p[1], 0) / r.length;
+    return rs.some((ring) => inRing(x, y, ring));
+  });
+  return { pMin, pMax, aMin, aMax, tall, bCount: onPlot.length, bRoof: Math.max(0, ...onPlot.map((b) => b.roofM)), bFloors: Math.max(0, ...onPlot.map((b) => b.floors ?? 0)) };
+}
+
+type Building = NonNullable<TerrainResponse["buildings"]>[number];
+const DRACO = "https://www.gstatic.com/draco/versioned/decoders/1.5.7/";
+/** Height of the geoid above the WGS84 ellipsoid near Larnaca (approx.): start value, corrected by ray casting. */
+const GEOID_N = 25;
+
+/** Clean building blocks from surveyed outlines and heights: walls to the eave, flat or hipped roofs (orthophoto on the roofs). */
+function buildingsGroup(m: Model, list: Building[], yGround: (g: number) => number, wallMat: THREE.Material, roofMat: THREE.Material): THREE.Group {
+  const { cols, rows, x0, y0, dx, dy } = m.t;
+  const west = x0, east = x0 + (cols - 1) * dx, north = y0, south = y0 - (rows - 1) * dy;
+  const X = (lng: number) => (lng - m.cx) * m.mLng, Z = (lat: number) => -(lat - m.cy) * m.mLat;
+  const UV = (lng: number, lat: number) => [(lng - west) / (east - west), (lat - south) / (north - south)];
+  const wp: number[] = [], rp: number[] = [], ruv: number[] = [];
+  const roofTri = (a: number[], b: number[], c: number[]) => {
+    for (const v of [a, b, c]) {
+      rp.push(X(v[0]!), v[2]!, Z(v[1]!));
+      ruv.push(...UV(v[0]!, v[1]!));
+    }
+  };
+  for (const b of list) {
+    const rs = b.rings.map((r) => r.slice(0, -1)).filter((r) => r.length >= 3);
+    if (!rs.length) continue;
+    const outer = rs[0]!;
+    const c = [outer.reduce((a, p) => a + p[0], 0) / outer.length, outer.reduce((a, p) => a + p[1], 0) / outer.length] as const;
+    const base = yGround(b.groundM ?? heightAt(m, m.ground, c[0], c[1]));
+    const wallTop = b.roof === "flat" ? b.roofM : b.roof === "mixed" ? Math.min(b.roofM, Math.max(b.eaveM, b.typicalM ?? b.roofM)) : b.eaveM;
+    const top = base + Math.max(1, wallTop);
+    for (const ring of rs)
+      ring.forEach((p, i) => {
+        const q = ring[(i + 1) % ring.length]!;
+        const [ax, az, bx, bz] = [X(p[0]), Z(p[1]), X(q[0]), Z(q[1])];
+        wp.push(ax, base, az, bx, base, bz, bx, top, bz, ax, base, az, bx, top, bz, ax, top, az);
+      });
+    const hip = b.roof === "pitched" && b.roofM - b.eaveM > 0.3 && rs.length === 1;
+    if (hip) {
+      const ridge = base + b.roofM, k = 0.3;
+      const inner = outer.map((p) => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k]);
+      outer.forEach((p, i) => {
+        const j = (i + 1) % outer.length;
+        const o1 = [p[0], p[1], top], o2 = [outer[j]![0], outer[j]![1], top], i1 = [inner[i]![0]!, inner[i]![1]!, ridge], i2 = [inner[j]![0]!, inner[j]![1]!, ridge];
+        roofTri(o1, o2, i2);
+        roofTri(o1, i2, i1);
+      });
+      const tris = THREE.ShapeUtils.triangulateShape(inner.map((p) => new THREE.Vector2(p[0], p[1])), []);
+      for (const [a, bb, cc] of tris) roofTri([...inner[a]!, ridge], [...inner[bb]!, ridge], [...inner[cc]!, ridge]);
+    } else {
+      const all = rs.flat();
+      const tris = THREE.ShapeUtils.triangulateShape(outer.map((p) => new THREE.Vector2(p[0], p[1])), rs.slice(1).map((h) => h.map((p) => new THREE.Vector2(p[0], p[1]))));
+      for (const [a, bb, cc] of tris) roofTri([...all[a]!, top], [...all[bb]!, top], [...all[cc]!, top]);
+    }
+  }
+  const g = new THREE.Group();
+  const wg = new THREE.BufferGeometry();
+  wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3));
+  wg.computeVertexNormals();
+  g.add(new THREE.Mesh(wg, wallMat));
+  const rg = new THREE.BufferGeometry();
+  rg.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3));
+  rg.setAttribute("uv", new THREE.Float32BufferAttribute(ruv, 2));
+  rg.computeVertexNormals();
+  g.add(new THREE.Mesh(rg, roofMat));
+  return g;
+}
+
+/** ECEF (Google 3D Tiles) → this view's local frame (x east, y up, z south) at lat/lng/ellipsoid height. */
+function ecefToLocal(latDeg: number, lngDeg: number, h: number): THREE.Matrix4 {
+  const a = 6378137, e2 = 6.69437999014e-3;
+  const φ = (latDeg * Math.PI) / 180, λ = (lngDeg * Math.PI) / 180;
+  const N = a / Math.sqrt(1 - e2 * Math.sin(φ) ** 2);
+  const O = new THREE.Vector3((N + h) * Math.cos(φ) * Math.cos(λ), (N + h) * Math.cos(φ) * Math.sin(λ), (N * (1 - e2) + h) * Math.sin(φ));
+  const e = new THREE.Vector3(-Math.sin(λ), Math.cos(λ), 0);
+  const n = new THREE.Vector3(-Math.sin(φ) * Math.cos(λ), -Math.sin(φ) * Math.sin(λ), Math.cos(φ));
+  const u = new THREE.Vector3(Math.cos(φ) * Math.cos(λ), Math.cos(φ) * Math.sin(λ), Math.sin(φ));
+  const m = new THREE.Matrix4().set(e.x, e.y, e.z, -e.dot(O), u.x, u.y, u.z, -u.dot(O), -n.x, -n.y, -n.z, n.dot(O), 0, 0, 0, 1);
+  return m;
+}
+
+type Mode = "ground" | "buildings" | "surface" | "google";
+interface TilesLike {
+  group: THREE.Group;
+  update(): void;
+  dispose(): void;
+  getAttributions?(): { type: string; value: unknown }[];
+  setCamera(c: THREE.Camera): void;
+  setResolutionFromRenderer(c: THREE.Camera, r: THREE.WebGLRenderer): void;
+  registerPlugin(p: unknown): void;
+  addEventListener(type: string, cb: (e: { error?: unknown; url?: string | URL; tile?: unknown }) => void): void;
 }
 
 export function Terrain3D({ country, parcel, onClose }: { country: string; parcel: Parcel; onClose(): void }) {
@@ -129,7 +223,14 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
   const host = useRef<HTMLDivElement | null>(null);
   const [model, setModel] = useState<Model>();
   const [error, setError] = useState<string>();
-  const [surfaceOn, setSurfaceOn] = useState(true);
+  const [mode, setMode] = useState<Mode>("buildings");
+  const surfaceOn = mode === "surface";
+  const [gKey, setGKey] = useState<string>();
+  const [gNote, setGNote] = useState<string>();
+  const [gCredits, setGCredits] = useState<string>("");
+  const buildings = useRef<THREE.Group | null>(null);
+  const mats = useRef<{ wall: THREE.MeshStandardMaterial; roof: THREE.MeshStandardMaterial } | null>(null);
+  const tilesRef = useRef<TilesLike | null>(null);
   const [ex, setEx] = useState(1.5);
   const [north, setNorth] = useState(0);
   const [busy, setBusy] = useState<string>();
@@ -140,9 +241,13 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
 
   useEffect(() => {
     const ac = new AbortController();
-    api.terrain(country, parcel.nationalRef, 100, ac.signal).then((r) => setModel(toModel(r))).catch((e) => !ac.signal.aborted && setError(e instanceof ApiError ? e.code : "generic"));
+    api.terrain(country, parcel.nationalRef, 100, ac.signal).then((r) => { setModel(toModel(r)); if (!r.buildings?.length) setMode(r.surface ? "surface" : "ground"); }).catch((e) => !ac.signal.aborted && setError(e instanceof ApiError ? e.code : "generic"));
     return () => ac.abort();
   }, [country, parcel.nationalRef]);
+
+  useEffect(() => {
+    api.googleTiles(i18n.language).then((g) => setGKey(g.key)).catch(() => undefined);
+  }, [i18n.language]);
 
   const figures = useMemo(() => (model ? stats(model, parcel) : undefined), [model, parcel]);
 
@@ -219,6 +324,11 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
         mat.map = tex;
         mat.color.set("#ffffff");
         mat.needsUpdate = true;
+        if (mats.current) {
+          mats.current.roof.map = tex;
+          mats.current.roof.color.set("#ffffff");
+          mats.current.roof.needsUpdate = true;
+        }
       },
     );
 
@@ -230,10 +340,24 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
     const group = new THREE.Group();
     scene.add(group);
     outline.current = group;
+    mats.current = {
+      wall: new THREE.MeshStandardMaterial({ color: "#EFE9DD", roughness: 0.9, side: THREE.DoubleSide }),
+      roof: new THREE.MeshStandardMaterial({ color: "#B9AFA0", roughness: 1, side: THREE.DoubleSide }),
+    };
+    const bg = new THREE.Group();
+    scene.add(bg);
+    buildings.current = bg;
 
     let raf = 0;
+    let credits = 0;
     const loop = () => {
       controls.update();
+      const tiles = tilesRef.current;
+      if (tiles) {
+        camera.updateMatrixWorld();
+        tiles.update();
+        if (++credits % 60 === 0) setGCredits((tiles.getAttributions?.() ?? []).filter((x) => x.type === "string").map((x) => String(x.value)).join(" · "));
+      }
       setNorth(controls.getAzimuthalAngle());
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
@@ -271,8 +395,12 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
     const w = (cols - 1) * cellM[0], d = (rows - 1) * cellM[1];
     const surf = surfaceOn ? model.surface : undefined;
     const base = figures?.aMin ?? model.t.baseM;
+    const google = mode === "google";
+    const exv = google ? 1 : ex; // Google's model is true to scale
+    mesh.visible = !google;
+    skirt.visible = !google;
     // the exaggeration applies to the lie of the land only: buildings and trees keep their real height
-    const yOf = (g: number, sv?: number) => (g - base) * ex + (sv !== undefined ? Math.max(0, sv - g) : 0);
+    const yOf = (g: number, sv?: number) => (g - base) * exv + (sv !== undefined ? Math.max(0, sv - g) : 0);
     const pos = mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < cols * rows; i++) pos.setY(i, yOf(model.ground[i]!, surf?.[i]));
     pos.needsUpdate = true;
@@ -280,7 +408,7 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
     mesh.geometry.computeBoundingSphere();
 
     // skirt: the four edges down to the floor
-    const floor = -Math.max(3, (figures ? figures.aMax - figures.aMin : 10) * ex * 0.12);
+    const floor = -Math.max(3, (figures ? figures.aMax - figures.aMin : 10) * exv * 0.12);
     const edge: number[] = [];
     for (let c = 0; c < cols; c++) edge.push(c);
     for (let r = 1; r < rows; r++) edge.push(r * cols + cols - 1);
@@ -334,7 +462,104 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
       fg.setIndex(fi);
       group.add(new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color: PLOT_COLOR, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })));
     }
-  }, [model, surfaceOn, ex, figures, parcel]);
+    // clean buildings
+    const bg = buildings.current;
+    if (bg && mats.current) {
+      bg.children.forEach((o) => o.children.forEach((x) => { if (x instanceof THREE.Mesh) x.geometry.dispose(); }));
+      bg.clear();
+      if (mode === "buildings" && model.t.buildings?.length) bg.add(buildingsGroup(model, model.t.buildings, (g) => (g - base) * exv, mats.current.wall, mats.current.roof));
+    }
+  }, [model, surfaceOn, mode, ex, figures, parcel]);
+
+  // Google Photorealistic 3D Tiles (Map Tiles API), placed in this view's frame and levelled on our terrain model
+  useEffect(() => {
+    const v = view.current;
+    if (mode !== "google" || !gKey || !v || !model || !figures) return;
+    let alive = true;
+    let tiles: TilesLike | null = null;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let failed = false;
+    setGNote(t("t3d.googleLoading"));
+    (async () => {
+      const [{ TilesRenderer }, plugins, { DRACOLoader }] = await Promise.all([
+        import("3d-tiles-renderer"),
+        import("3d-tiles-renderer/plugins"),
+        import("three/examples/jsm/loaders/DRACOLoader.js"),
+      ]);
+      if (!alive) return;
+      const tr = new TilesRenderer() as unknown as TilesLike;
+      tr.registerPlugin(new plugins.GoogleCloudAuthPlugin({ apiToken: gKey, autoRefreshToken: true }));
+      tr.registerPlugin(new plugins.GLTFExtensionsPlugin({ dracoLoader: new DRACOLoader().setDecoderPath(DRACO) }));
+      tr.registerPlugin(new plugins.TileCompressionPlugin());
+      tr.registerPlugin(new plugins.TilesFadePlugin());
+      // the root tileset failing (bad key, API not enabled, quota) is reported as an event
+      tr.addEventListener("load-error", (e) => {
+        if (!alive) return;
+        if (!e.tile || /root\.json/.test(String(e.url ?? ""))) {
+          failed = true;
+          setGNote(t("t3d.googleError"));
+          if (timer) clearInterval(timer);
+        }
+      });
+      tr.setCamera(v.camera);
+      tr.setResolutionFromRenderer(v.camera, v.renderer);
+      const base = figures.aMin;
+      const frame = ecefToLocal(model.cy, model.cx, base + GEOID_N);
+      tr.group.matrixAutoUpdate = false;
+      tr.group.matrix.copy(frame);
+      tr.group.matrixWorldNeedsUpdate = true;
+      v.scene.add(tr.group);
+      tiles = tr;
+      tilesRef.current = tr;
+      // level Google's model on ours: cast rays at bare-ground cells, shift by the median difference
+      const ray = new THREE.Raycaster();
+      const { cols, rows, x0, y0, dx, dy } = model.t;
+      const bare: [number, number, number][] = [];
+      for (let k = 0; k < 400 && bare.length < 25; k++) {
+        const c = Math.floor(Math.random() * cols), r = Math.floor(Math.random() * rows), i = r * cols + c;
+        if (model.surface && model.surface[i]! - model.ground[i]! > 0.4) continue;
+        const lng0 = x0 + c * dx, lat0 = y0 - r * dy;
+        bare.push([(lng0 - model.cx) * model.mLng, model.ground[i]! - base, -(lat0 - model.cy) * model.mLat]);
+      }
+      let tries = 0;
+      if (failed) return;
+      timer = setInterval(() => {
+        if (!alive || !tiles || failed) return;
+        tries++;
+        tiles.group.updateMatrixWorld(true);
+        const diffs: number[] = [];
+        for (const [x, y, z] of bare) {
+          ray.set(new THREE.Vector3(x, y + 500, z), new THREE.Vector3(0, -1, 0));
+          const hit = ray.intersectObject(tiles.group, true)[0];
+          if (hit) diffs.push(hit.point.y - y);
+        }
+        if (diffs.length >= 5) {
+          diffs.sort((a, b) => a - b);
+          const off = diffs[Math.floor(diffs.length / 2)]!;
+          if (Math.abs(off) > 0.05) {
+            tiles.group.matrix.premultiply(new THREE.Matrix4().makeTranslation(0, -off, 0));
+            tiles.group.matrixWorldNeedsUpdate = true;
+          }
+          setGNote(undefined);
+          if (Math.abs(off) < 0.3) clearInterval(timer);
+        } else if (tries > 20) {
+          setGNote(t("t3d.googleNone"));
+          clearInterval(timer);
+        }
+      }, 1000);
+    })().catch(() => alive && setGNote(t("t3d.googleError")));
+    return () => {
+      alive = false;
+      if (timer) clearInterval(timer);
+      if (tiles) {
+        v.scene.remove(tiles.group);
+        tiles.dispose();
+      }
+      tilesRef.current = null;
+      setGNote(undefined);
+      setGCredits("");
+    };
+  }, [mode, gKey, model, figures, t]);
 
   const name = `plotcheck-3d-${parcel.nationalRef.replace(/[^\w-]+/g, "_")}`;
   const savePng = () => {
@@ -355,10 +580,10 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
     g.fillText(t("plot.title", { label: parcel.label ?? "" }) + `  ·  ${parcel.nationalRef}`, 30 * s, 52 * s);
     g.font = `${19 * s}px system-ui, sans-serif`;
     g.fillText(t("t3d.groundOnPlot", { min: fmtNumber(figures.pMin, lng, 1), max: fmtNumber(figures.pMax, lng, 1) }), 30 * s, 84 * s);
-    g.fillText(`${t(surfaceOn && model.surface ? "t3d.surface" : "t3d.ground")} · ${t("t3d.around", { m: model.t.bufferM })} · ${t("t3d.exaggeration")} ${ex}×`, 30 * s, 112 * s);
+    g.fillText(`${t(`t3d.mode.${mode}`)} · ${t("t3d.around", { m: model.t.bufferM })}${mode === "google" ? "" : ` · ${t("t3d.exaggeration")} ${ex}×`}`, 30 * s, 112 * s);
     g.font = `${15 * s}px system-ui, sans-serif`;
     g.fillStyle = "rgba(255,255,255,0.85)";
-    const credit = t("t3d.credit");
+    const credit = mode === "google" ? `Google · ${gCredits}` : t("t3d.credit");
     g.fillRect(16 * s, out.height - 40 * s, g.measureText(credit).width + 24 * s, 28 * s);
     g.fillStyle = "#1C2321";
     g.fillText(credit, 28 * s, out.height - 21 * s);
@@ -399,6 +624,11 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
             <>
               <Text testID="t3d-plot-heights" style={{ fontSize: 13, color: colors.ink }}>{t("t3d.groundOnPlot", { min: fmtNumber(figures.pMin, lng, 1), max: fmtNumber(figures.pMax, lng, 1) })} · {t("t3d.fall", { m: fmtNumber(figures.pMax - figures.pMin, lng, 1) })}</Text>
               <Text style={{ fontSize: 12, color: colors.muted }}>{t("t3d.area", { m: model.t.bufferM, min: fmtNumber(figures.aMin, lng, 1), max: fmtNumber(figures.aMax, lng, 1) })}{figures.tall > 2.5 ? ` · ${t("t3d.tallest", { m: fmtNumber(figures.tall, lng, 1) })}` : ""}</Text>
+              {figures.bCount > 0 && (
+                <Text testID="t3d-buildings-on-plot" style={{ fontSize: 12, color: colors.muted }}>
+                  {t("t3d.onPlot", { count: figures.bCount, m: fmtNumber(figures.bRoof, lng, 1) })}{figures.bFloors ? ` · ${t("t3d.floors", { n: figures.bFloors })}` : ""}
+                </Text>
+              )}
             </>
           )}
         </View>
@@ -417,13 +647,17 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
       {model && (
         <View pointerEvents="box-none" style={{ position: "absolute", left: 10, right: 10, bottom: 12, gap: 8 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-            {model.surface && (
-              <>
-                <Pressable testID="t3d-ground" onPress={() => setSurfaceOn(false)} style={chip(!surfaceOn)}><Text style={chipText(!surfaceOn)}>⛰ {t("t3d.ground")}</Text></Pressable>
-                <Pressable testID="t3d-surface" onPress={() => setSurfaceOn(true)} style={chip(surfaceOn)}><Text style={chipText(surfaceOn)}>🏘 {t("t3d.surface")}</Text></Pressable>
-              </>
-            )}
-            {[1, 1.5, 2, 3].map((x) => (
+            {([
+              ["ground", "⛰", true],
+              ["buildings", "🏠", !!model.t.buildings?.length],
+              ["surface", "🌳", !!model.surface],
+              ["google", "🌐", !!gKey],
+            ] as const).filter((x) => x[2]).map(([id, icon]) => (
+              <Pressable key={id} testID={`t3d-${id}`} onPress={() => setMode(id)} style={chip(mode === id)}><Text style={chipText(mode === id)}>{icon} {t(`t3d.mode.${id}`)}</Text></Pressable>
+            ))}
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {mode !== "google" && [1, 1.5, 2, 3].map((x) => (
               <Pressable key={x} testID={`t3d-ex-${x}`} onPress={() => setEx(x)} style={chip(ex === x)}><Text style={chipText(ex === x)}>↕ {x}×</Text></Pressable>
             ))}
           </View>
@@ -433,9 +667,16 @@ export function Terrain3D({ country, parcel, onClose }: { country: string; parce
             <Pressable testID="t3d-streetview" onPress={() => { const r = rings(parcel.geometry)[0]!.slice(0, -1); window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${(r.reduce((a, p) => a + p[1]!, 0) / r.length).toFixed(6)},${(r.reduce((a, p) => a + p[0]!, 0) / r.length).toFixed(6)}`, "_blank"); }} style={chip(false)}><Text style={chipText(false)}>🚶 {t("plot.streetView")}</Text></Pressable>
             <Pressable testID="t3d-glb" onPress={saveGlb} style={chip(false)}><Text style={chipText(false)}>{busy === "glb" ? "…" : "🧊"} {t("t3d.glb")}</Text></Pressable>
           </View>
-          <Text style={{ fontSize: 11, color: colors.ink, backgroundColor: "rgba(255,255,255,0.8)", alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-            {t("t3d.hint")} · {model.t.source} · {t("t3d.credit")}
-          </Text>
+          {gNote && <Text testID="t3d-google-note" style={{ fontSize: 13, color: colors.ink, backgroundColor: "rgba(255,255,255,0.92)", alignSelf: "flex-start", padding: 6, borderRadius: 6 }}>{gNote}</Text>}
+          {mode === "google" ? (
+            <Text testID="t3d-google-credits" style={{ fontSize: 11, color: colors.ink, backgroundColor: "rgba(255,255,255,0.85)", alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ fontWeight: "800" }}>Google</Text> · {gCredits || t("t3d.googleCredit")}
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 11, color: colors.ink, backgroundColor: "rgba(255,255,255,0.8)", alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              {t("t3d.hint")} · {model.t.source}{mode === "buildings" ? ` · ${t("t3d.buildingsSource")}` : ""} · {t("t3d.credit")}
+            </Text>
+          )}
         </View>
       )}
     </View>,

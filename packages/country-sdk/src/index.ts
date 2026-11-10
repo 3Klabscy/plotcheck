@@ -265,11 +265,29 @@ export interface TerrainModel {
   ground: string;
   /** Ground with buildings and trees (surface model), same cells. */
   surface?: string;
+  /** Building outlines with their heights above ground (official survey), for clean 3D blocks. */
+  buildings?: TerrainBuilding[];
+  buildingsSource?: string;
   /** The box shown: plot extent plus the buffer, [west, south, east, north]. */
   box: [number, number, number, number];
   bufferM: number;
   source: string;
   sourceRef?: string;
+}
+
+export interface TerrainBuilding {
+  /** Outer ring, then holes ([lng, lat]). */
+  rings: [number, number][][];
+  /** Ridge / top height above ground, metres. */
+  roofM: number;
+  /** Eave (wall top) height above ground, metres. */
+  eaveM: number;
+  roof: "flat" | "pitched" | "mixed";
+  /** Typical height from the surface model (for mixed roofs), metres above ground. */
+  typicalM?: number;
+  floors?: number;
+  /** Lowest ground under the outline, metres above sea level (terrain model). */
+  groundM?: number;
 }
 
 /** Figures for the areas around a point (statistics), from the finest level to the widest. */

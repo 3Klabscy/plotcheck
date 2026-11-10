@@ -18,6 +18,8 @@ export interface TerrainResponse {
   cols: number; rows: number; x0: number; y0: number; dx: number; dy: number;
   cellM: [number, number]; baseM: number; ground: string; surface?: string;
   box: [number, number, number, number]; bufferM: number; source: string; sourceRef?: string;
+  buildings?: { rings: [number, number][][]; roofM: number; eaveM: number; roof: "flat" | "pitched" | "mixed"; typicalM?: number; floors?: number; groundM?: number }[];
+  buildingsSource?: string;
   geometry: Parcel["geometry"];
 }
 export interface LegendItem { label: string; image: string }
@@ -191,7 +193,7 @@ export const api = {
     call<AreaInfo>(`/v1/area-info?country=${encodeURIComponent(country)}&layer=${encodeURIComponent(layer)}&lng=${lng.toFixed(6)}&lat=${lat.toFixed(6)}`),
   mapLegend: (country: string, layer: string, layers: string) =>
     call<{ items: LegendItem[] }>(`/v1/map-legend?country=${encodeURIComponent(country)}&layer=${encodeURIComponent(layer)}&layers=${encodeURIComponent(layers)}`),
-  googleTiles: (lang: string) => call<{ available: boolean; tiles?: Partial<Record<"roadmap" | "satellite" | "hybrid", string>> }>(`/v1/maps/google?lang=${lang === "en" ? "en" : "el"}`),
+  googleTiles: (lang: string) => call<{ available: boolean; tiles?: Partial<Record<"roadmap" | "satellite" | "hybrid", string>>; key?: string }>(`/v1/maps/google?lang=${lang === "en" ? "en" : "el"}`),
   plotIndex: (country: string, region: string) => call<PlotSearchIndex>(`/v1/plot-index?country=${encodeURIComponent(country)}&region=${encodeURIComponent(region)}`),
   parcelsById: (country: string, identifiers: Record<string, string>, signal?: AbortSignal) =>
     call<{ country: string; parcels: Parcel[] }>("/v1/parcels/by-id", { body: { country, identifiers }, signal }),

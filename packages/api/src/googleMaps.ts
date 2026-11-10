@@ -12,6 +12,8 @@ export interface GoogleTiles {
   available: boolean;
   /** Tile URL templates ({z}/{x}/{y}) per map type. */
   tiles?: Partial<Record<GoogleMapType, string>>;
+  /** Browser key (restricted to the app's addresses) for Photorealistic 3D Tiles. */
+  key?: string;
 }
 
 const CREATE = "https://tile.googleapis.com/v1/createSession";
@@ -36,5 +38,5 @@ export async function googleTiles(deps: { fetch: typeof fetch; env(k: string): s
     if (Object.keys(tiles).length === 0) throw new Error("google_tiles_unavailable");
     return tiles;
   });
-  return { available: true, tiles: value };
+  return { available: true, tiles: value, key };
 }

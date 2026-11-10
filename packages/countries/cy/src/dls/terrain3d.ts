@@ -1,6 +1,7 @@
 import type { Parcel } from "@plotcheck/core";
 import type { ProviderContext, TerrainModel } from "@plotcheck/country-sdk";
 import { DTM_SOURCE_URL, terrainGrid, type Grid } from "./elevation.ts";
+import { cyBuildingsIn, measureBuildings } from "./buildings3d.ts";
 
 const NODATA = -32768;
 /** Longest side of the grid in cells: ~220 keeps a plot + 100 m at 1 m and the answer near 200 kB. */
@@ -39,11 +40,15 @@ export async function cyTerrainModel(ctx: ProviderContext, parcel: Parcel, buffe
   const hasData = (g: Grid | undefined) => !!g && g.values.some((v) => !Number.isNaN(v));
   // ground (1 m) and surface (0.5 m: read at twice the step, which lands on the same cells) in
   // parallel; one retry if a read failed
+  const buildingsP = cyBuildingsIn(ctx, box).catch(() => undefined);
   let [ground, surface] = await Promise.all([terrainGrid(ctx, box, step).catch(() => undefined), terrainGrid(ctx, box, step * 2, true).catch(() => undefined)]);
+  if (!hasData(surface)) surface = await terrainGrid(ctx, box, step * 2, true).catch(() => undefined);
   if (!hasData(ground)) ground = await terrainGrid(ctx, box, step).catch(() => undefined);
   if (!ground || !hasData(ground)) return undefined;
   if (surface && (surface.cols !== ground.cols || surface.rows !== ground.rows || Math.abs(surface.x0 - ground.x0) > ground.dx / 4))
     surface = await terrainGrid(ctx, box, step, true, ground).catch(() => undefined);
+  const raw = await buildingsP;
+  const buildings = raw ? measureBuildings(raw, ground, hasData(surface) ? surface : undefined) : undefined;
   let min = Infinity;
   for (const v of ground.values) if (!Number.isNaN(v) && v < min) min = v;
   const baseM = Math.floor(min);
@@ -54,6 +59,7 @@ export async function cyTerrainModel(ctx: ProviderContext, parcel: Parcel, buffe
     baseM,
     ground: encodeHeights(ground.values, baseM),
     ...(surface && surface.values.some((v) => !Number.isNaN(v)) ? { surface: encodeHeights(surface.values, baseM) } : {}),
+    ...(buildings && buildings.length ? { buildings, buildingsSource: "DLS INSPIRE Buildings (surveyed roof and eave heights)" } : {}),
     box, bufferM,
     source: `DLS DTM 2019${surface ? " + DSM 2019" : ""}, ${Math.round(ground.dx * mLng * 10) / 10} m`,
     sourceRef: DTM_SOURCE_URL,
